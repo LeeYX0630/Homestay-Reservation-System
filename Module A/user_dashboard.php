@@ -53,7 +53,7 @@ $user = $user_res->fetch_assoc();
 $profile_pic = !empty($user['profile_image']) ? "uploads/".$user['profile_image'] : "uploads/default.png";
 
 $page_title = "My Dashboard";
-include 'header.php'; 
+include '../includes/header.php'; 
 ?>
 
 <div class="container-fluid px-md-5 mt-5 mb-5">
@@ -150,5 +150,5 @@ include 'header.php';
 </script>
 
 <?php 
-include 'footer.php'; 
+include '../includes/footer.php'; 
 ?>

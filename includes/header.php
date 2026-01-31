@@ -70,22 +70,25 @@ if (isset($_SESSION['user_id'])) {
       <div class="container-fluid px-4">
         
 <?php
-
+          // --- 1. 路径修正逻辑 ---
           if (isset($is_home_root) && $is_home_root === true) {
               $path_prefix_root = "";          
               $path_prefix_module_a = "Module A/"; 
               $logout_redirect = "index.php";   
           } else {
-              
               $path_prefix_root = "../";        
               $path_prefix_module_a = "";       
               $logout_redirect = "../index.php";
           }
           
-          // Logo 逻辑
+          // --- 2. 补全缺失的变量定义 (修复报错的关键) ---
+          // 定义 Logo 点击事件（通常为空，或者是回首页）
           $logo_link = $path_prefix_root . "index.php";
-          // ... (保留你原有的 admin logout 确认逻辑) ...
-        ?>
+          $logo_onclick = ""; 
+
+          // 定义登出按钮的确认弹窗属性
+          $logout_attr = 'onclick="return confirm(\'Are you sure you want to sign out?\');"';
+?>
 
         <a class="navbar-brand d-flex align-items-center" href="<?php echo $logo_link; ?>" onclick="<?php echo $logo_onclick; ?>">
           <img src="tehtariklogo.jpg" alt="Logo" style="height: 32px; width: auto;" class="d-inline-block align-text-top me-2 rounded">

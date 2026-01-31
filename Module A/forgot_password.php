@@ -1,7 +1,7 @@
 <?php
 // forgot_password.php
 session_start();
-require_once 'db_connection.php';
+require_once '../includes/db_connection.php';
 
 $error = "";
 $success_link = "";
@@ -23,7 +23,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $update->bind_param("ss", $token, $email);
         
         if ($update->execute()) {
-            $success_link = "http://localhost/tehtariknotarik_project/reset_password.php?token=" . $token;
+            $success_link = "reset_password.php?token=" . $token;
         } else {
             $error = "System error. Could not generate token.";
         }
@@ -33,7 +33,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 $page_title = "Forgot Password";
-include_once 'header.php'; 
+include_once '../includes/header.php'; 
 ?>
 
 <div class="container mt-5 mb-5">
@@ -85,4 +85,4 @@ include_once 'header.php';
     </div>
 </div>
 
-<?php include_once 'footer.php'; ?>
+<?php include_once '../includes/footer.php'; ?>
