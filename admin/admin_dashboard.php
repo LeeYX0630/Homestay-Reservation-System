@@ -3,7 +3,16 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// --- 处理 Super Admin 验证逻辑 (当在弹窗里提交登录时) ---
+// --- 1. 模拟登录 (如果没有做 login.php，请保留这几行用于测试) ---
+// 想要测试普通管理员，请注释掉下面三行
+// 想要测试 Super Admin，请取消注释下面三行
+if (!isset($_SESSION['role'])) {
+    $_SESSION['admin_id'] = 1;
+    $_SESSION['username'] = 'superadmin'; // 改成 'manager' 测试普通管理员
+    $_SESSION['role'] = 'superadmin';     // 改成 'admin' 测试普通管理员
+}
+
+// --- 2. 处理 Super Admin 验证逻辑 (弹窗提交) ---
 $verify_msg = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_super'])) {
     $sa_username = $_POST['sa_username'];
@@ -17,97 +26,273 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_super'])) {
 
     if ($row = $result->fetch_assoc()) {
         if (password_verify($sa_password, $row['password'])) {
-            // 验证成功！将当前 Session 升级为 Super Admin
+            // 验证成功！升级权限
             $_SESSION['role'] = 'superadmin';
-            $_SESSION['admin_id'] = $row['admin_id']; // 可选：变成那个超级管理员的ID
+            $_SESSION['admin_id'] = $row['admin_id'];
             $_SESSION['username'] = $row['username'];
-            
-            // 跳转到添加页面
-            header("Location: add_admin.php");
+            header("Location: add_admin.php"); // 跳转
             exit();
         } else {
-            $verify_msg = "<script>alert('Wrong password for Super Admin!');</script>";
+            $verify_msg = "Wrong password!";
         }
     } else {
-        $verify_msg = "<script>alert('Super Admin username not found!');</script>";
+        $verify_msg = "Super Admin not found!";
     }
 }
+
+// --- 3. 获取统计数据 (替换 HTML 中的假数据) ---
+// 总订单
+$res_count = $conn->query("SELECT COUNT(*) as total FROM bookings");
+$total_bookings = $res_count->fetch_assoc()['total'];
+
+// 总收入 (已确认订单)
+$res_revenue = $conn->query("SELECT SUM(total_price) as revenue FROM bookings WHERE booking_status = 'confirmed'");
+$total_revenue = $res_revenue->fetch_assoc()['revenue'] ?? 0;
+
+// 待入住 (未来订单)
+$today = date('Y-m-d');
+$res_upcoming = $conn->query("SELECT COUNT(*) as upcoming FROM bookings WHERE booking_status = 'confirmed' AND check_in_date >= '$today'");
+$upcoming_bookings = $res_upcoming->fetch_assoc()['upcoming'];
+
+// 获取最新的 5 条订单 (用于填充 Recent Orders 表格)
+$sql_recent = "SELECT b.*, r.room_name FROM bookings b JOIN rooms r ON b.room_id = r.room_id ORDER BY b.booking_id DESC LIMIT 5";
+$recent_orders = $conn->query($sql_recent);
 ?>
 
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Admin Dashboard</title>
-    <link rel="stylesheet" href="../css/style.css">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Admin Dashboard | Homestay System</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
+
     <style>
-        /* ... 你之前的样式 ... */
-        
-        /* 简单的弹窗样式 (Modal) */
-        .modal { display: none; position: fixed; z-index: 1; left: 0; top: 0; width: 100%; height: 100%; background-color: rgba(0,0,0,0.5); }
-        .modal-content { background-color: white; margin: 15% auto; padding: 20px; border: 1px solid #888; width: 300px; border-radius: 8px; text-align: center; }
-        .close { color: #aaa; float: right; font-size: 28px; font-weight: bold; cursor: pointer; }
+      /* Sidebar Adjustments */
+      .sidebar { min-height: 100vh; box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1); }
+      
+      /* Card Hover Effects */
+      .stat-card { transition: transform 0.2s; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+      .stat-card:hover { transform: translateY(-5px); box-shadow: 0 8px 12px rgba(0,0,0,0.2); }
+      
+      /* Modal Styles */
+      .modal-backdrop { z-index: 1040; }
+      .modal { z-index: 1050; }
     </style>
-</head>
-<body>
-    <?php echo $verify_msg; ?>
+  </head>
+  <body>
 
-    <div class="dashboard-container">
-        <div class="sidebar">
-            <h2>Admin Panel</h2>
-            <p>Welcome, <?php echo htmlspecialchars($_SESSION['username']); ?> (<?php echo ucfirst($_SESSION['role']); ?>)</p>
-            <hr>
-            <a href="admin_dashboard.php" class="active">Dashboard</a>
-            
-            <?php if ($_SESSION['role'] === 'superadmin'): ?>
-                <a href="add_admin.php">Add New Admin</a>
-            <?php else: ?>
-                <a href="#" onclick="openModal()">Add New Admin 🔒</a>
-            <?php endif; ?>
-            
-            <a href="../logout.php">Logout</a>
+    <header class="navbar navbar-dark sticky-top bg-dark flex-md-nowrap p-0 shadow">
+      <a class="navbar-brand col-md-3 col-lg-2 me-0 px-3" href="#">Homestay Admin 🏨</a>
+      <button class="navbar-toggler position-absolute d-md-none collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#sidebarMenu" aria-controls="sidebarMenu" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="navbar-nav">
+        <div class="nav-item text-nowrap">
+          <a class="nav-link px-3" href="../logout.php">Sign out</a>
         </div>
+      </div>
+    </header>
 
-        <div class="main-content">
-            <h1>Dashboard</h1>
-            
-            <div style="background: white; padding: 20px;">
-                <h2>Quick Actions</h2>
+    <div class="container-fluid">
+      <div class="row">
+        
+        <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse"> 
+          <div class="position-sticky pt-3">
+            <ul class="nav flex-column">
+              <li class="nav-item">
+                <a class="nav-link active" href="admin_dashboard.php">
+                  <i class="bi bi-speedometer2 me-2"></i> Dashboard
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="admin_manage_booking.php">
+                  <i class="bi bi-file-earmark-text me-2"></i> Manage Bookings
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link" href="admin_manage_rooms.php">
+                  <i class="bi bi-house-door me-2"></i> Manage Rooms
+                </a>
+              </li>
+              
+              <li class="nav-item">
                 <?php if ($_SESSION['role'] === 'superadmin'): ?>
-                    <a href="add_admin.php" class="btn-primary">Add Admin</a>
+                    <a class="nav-link text-success" href="add_admin.php">
+                        <i class="bi bi-person-plus-fill me-2"></i> Add New Admin
+                    </a>
                 <?php else: ?>
-                    <button onclick="openModal()" class="btn-primary" style="background:#555;">Add Admin (Locked)</button>
+                    <a class="nav-link text-secondary" href="#" data-bs-toggle="modal" data-bs-target="#superAdminModal">
+                        <i class="bi bi-lock-fill me-2"></i> Add Admin (Locked)
+                    </a>
                 <?php endif; ?>
+              </li>
+            </ul>
+
+            <hr class="my-3">
+
+            <div class="p-3">
+                <div class="d-flex align-items-center link-dark text-decoration-none">
+                    <i class="bi bi-person-circle fs-4 me-2"></i>
+                    <div>
+                        <strong><?php echo htmlspecialchars($_SESSION['username']); ?></strong><br>
+                        <small class="text-muted"><?php echo ucfirst($_SESSION['role']); ?></small>
+                    </div>
+                </div>
             </div>
-        </div>
+          </div>
+        </nav>
+
+        <main class="col-md-9 ms-sm-auto col-lg-10 px-md-4">
+          
+          <?php if (!empty($verify_msg)): ?>
+            <div class="alert alert-danger mt-3 alert-dismissible fade show" role="alert">
+                <?php echo $verify_msg; ?>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+          <?php endif; ?>
+
+          <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
+            <h1 class="h2">Dashboard Overview</h1>
+            <div class="btn-toolbar mb-2 mb-md-0">
+               <a href="../index.php" target="_blank" class="btn btn-sm btn-outline-secondary">
+                   <i class="bi bi-box-arrow-up-right me-1"></i> View Live Site
+               </a>
+            </div>
+          </div>
+
+          <div class="row g-4 mb-4"> 
+            
+            <div class="col-12 col-md-6 col-lg-4"> 
+                <div class="card bg-primary text-white stat-card h-100"> 
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <h6 class="card-title text-uppercase mb-0 opacity-75">Total Bookings</h6>
+                            <h2 class="display-4 fw-bold my-2"><?php echo $total_bookings; ?></h2>
+                            <p class="card-text small">Lifetime orders</p>
+                        </div>
+                        <i class="bi bi-cart3" style="font-size: 3rem; opacity: 0.5;"></i>
+                    </div>
+                </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-4"> 
+                <div class="card bg-success text-white stat-card h-100">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title text-uppercase mb-0 opacity-75">Total Revenue</h6>
+                                <h2 class="display-4 fw-bold my-2">RM <?php echo number_format($total_revenue, 0); ?></h2>
+                                <p class="card-text small">Confirmed payments</p>
+                            </div>
+                            <i class="bi bi-currency-dollar" style="font-size: 3rem; opacity: 0.5;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6 col-lg-4"> 
+                <div class="card bg-warning text-dark stat-card h-100"> 
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <h6 class="card-title text-uppercase mb-0 opacity-75">Upcoming Stays</h6>
+                                <h2 class="display-4 fw-bold my-2"><?php echo $upcoming_bookings; ?></h2>
+                                <p class="card-text small">Check-ins pending</p>
+                            </div>
+                            <i class="bi bi-calendar-check" style="font-size: 3rem; opacity: 0.5;"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-12">
+                <div class="card border-0 shadow-sm">
+                    <div class="card-body">
+                        <h5 class="card-title">Weekly Traffic (Demo Chart)</h5>
+                        <img src="https://quickchart.io/chart?c={type:'line',data:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],datasets:[{label:'Visitors',data:[50,60,70,180,190,200,150],borderColor:'blue',fill:false}]},options:{legend:{display:false}}}" class="img-fluid" style="max-height: 250px; width: 100%; object-fit: contain;" alt="Chart">
+                    </div>
+                </div>
+            </div>
+
+          </div>
+
+          <h3 class="mt-4">Recent Orders</h3>
+          <div class="table-responsive bg-white shadow-sm rounded p-3">
+            <table class="table table-hover align-middle">
+              <thead class="table-light">
+                <tr>
+                  <th scope="col">ID</th>
+                  <th scope="col">Room</th>
+                  <th scope="col">Dates</th>
+                  <th scope="col">Amount</th>
+                  <th scope="col">Status</th>
+                  <th scope="col">Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                <?php if ($recent_orders->num_rows > 0): ?>
+                    <?php while($row = $recent_orders->fetch_assoc()): ?>
+                    <tr>
+                      <td>#<?php echo $row['booking_id']; ?></td>
+                      <td><?php echo htmlspecialchars($row['room_name']); ?></td>
+                      <td>
+                          <small class="d-block text-muted">In: <?php echo $row['check_in_date']; ?></small>
+                          <small class="d-block text-muted">Out: <?php echo $row['check_out_date']; ?></small>
+                      </td>
+                      <td>RM <?php echo number_format($row['total_price'], 2); ?></td>
+                      <td>
+                        <?php 
+                            $badge = ($row['booking_status'] == 'confirmed') ? 'bg-success' : 'bg-secondary';
+                            if ($row['booking_status'] == 'cancelled') $badge = 'bg-danger';
+                            echo "<span class='badge $badge'>" . ucfirst($row['booking_status']) . "</span>";
+                        ?>
+                      </td>
+                      <td>
+                          <a href="admin_manage_booking.php" class="btn btn-sm btn-outline-primary">Manage</a>
+                      </td>
+                    </tr>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <tr><td colspan="6" class="text-center py-3">No orders found.</td></tr>
+                <?php endif; ?>
+              </tbody>
+            </table>
+          </div>
+        </main>
+      </div>
     </div>
 
-    <div id="superAdminModal" class="modal">
+    <div class="modal fade" id="superAdminModal" tabindex="-1" aria-labelledby="modalLabel" aria-hidden="true">
+      <div class="modal-dialog">
         <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h3>Super Admin Login</h3>
-            <p>Privilege escalation required.</p>
+          <div class="modal-header bg-dark text-white">
+            <h5 class="modal-title" id="modalLabel">🔐 Super Admin Login Required</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <p>You need Super Admin privileges to add a new administrator. Please verify your credentials.</p>
             <form method="POST">
                 <input type="hidden" name="verify_super" value="1">
-                <div style="margin-bottom:10px;">
-                    <input type="text" name="sa_username" placeholder="Super Admin Username" required style="width:100%; padding:8px;">
+                <div class="mb-3">
+                    <label class="form-label">Super Admin Username</label>
+                    <input type="text" name="sa_username" class="form-control" required placeholder="superadmin">
                 </div>
-                <div style="margin-bottom:10px;">
-                    <input type="password" name="sa_password" placeholder="Password" required style="width:100%; padding:8px;">
+                <div class="mb-3">
+                    <label class="form-label">Password</label>
+                    <input type="password" name="sa_password" class="form-control" required placeholder="********">
                 </div>
-                <button type="submit" class="btn-primary" style="width:100%;">Verify & Login</button>
+                <button type="submit" class="btn btn-primary w-100">Verify & Login</button>
             </form>
+          </div>
         </div>
+      </div>
     </div>
 
-    <script>
-        // JS 控制弹窗显示/隐藏
-        var modal = document.getElementById("superAdminModal");
-        function openModal() { modal.style.display = "block"; }
-        function closeModal() { modal.style.display = "none"; }
-        // 点击窗口外也可以关闭
-        window.onclick = function(event) { if (event.target == modal) { closeModal(); } }
-    </script>
-
-</body>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+  </body>
 </html>

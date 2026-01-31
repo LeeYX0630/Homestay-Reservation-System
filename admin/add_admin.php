@@ -9,7 +9,12 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'superadmin') {
     exit();
 }
 
-// ... 剩下的代码 ...
+// 加在admin_login.php后面的代码示例：
+//$_SESSION['admin_id'] = $row['admin_id'];
+//$_SESSION['username'] = $row['username'];
+//$_SESSION['role'] = $row['role']; // <--- 这一步最关键！
+// ... 跳转到 dashboard ...
+
 $msg = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
