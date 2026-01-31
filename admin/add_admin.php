@@ -1,14 +1,15 @@
 <?php
-// admin/add_admin.php
 session_start();
 require_once '../includes/db_connection.php';
 
-// --- 权限检查 (正式上线时请取消注释，确保只有已登录的管理员才能添加新管理员) ---
-// if (!isset($_SESSION['admin_id'])) {
-//     header("Location: admin_login.php");
-//     exit();
-// }
+// --- 安全检查：只有 Super Admin 才能进这个页面 ---
+if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'superadmin') {
+    // 如果不是 superadmin，直接踢回 dashboard，或者显示“权限不足”
+    echo "<script>alert('Access Denied. Super Admin only.'); window.location.href='admin_dashboard.php';</script>";
+    exit();
+}
 
+// ... 剩下的代码 ...
 $msg = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
