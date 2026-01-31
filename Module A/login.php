@@ -7,12 +7,12 @@ ini_set('session.gc_maxlifetime', 86400);
 session_set_cookie_params(86400);
 
 session_start();
-require_once 'db_connection.php';
+require_once '../includes/db_connection.php';
 
 // 2. Redirect if already logged in
 if (isset($_SESSION['user_id'])) {
     if ($_SESSION['role'] === 'Admin') {
-        header("Location: admin_dashboard.php");
+        header("Location: ../Module C/admin_dashboard.php");
     } else {
         header("Location: user_dashboard.php");
     }
@@ -71,7 +71,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 ob_end_flush();
 
 $page_title = "Login - Homestay";
-include_once 'header.php'; 
+include_once '../includes/header.php'; 
 ?>
 
 <div class="container mt-5 mb-5">
@@ -137,4 +137,4 @@ include_once 'header.php';
     </div>
 </div>
 
-<?php include_once 'footer.php'; ?>
+<?php include_once '../includes/footer.php'; ?>

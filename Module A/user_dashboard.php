@@ -5,7 +5,7 @@
 date_default_timezone_set("Asia/Kuala_Lumpur");
 
 session_start();
-require_once 'db_connection.php';
+require_once '../includes/db_connection.php';
 
 // 2. Safety check: must be Customer
 if (!isset($_SESSION['user_id'])) {

@@ -6,7 +6,6 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 include_once 'db_connection.php';
-
 // 1. Get current page filename
 $current_page = basename($_SERVER['PHP_SELF']);
 
@@ -70,16 +69,22 @@ if (isset($_SESSION['user_id'])) {
     <nav class="navbar navbar-dark p-3 shadow bg-brand-dark">
       <div class="container-fluid px-4">
         
-        <?php
-          // Default: Logo goes to Home, no popup
-          $logo_link = "index.php";
-          $logo_onclick = "";
+<?php
 
-          // only triggered if admin is logged in
-          if (isset($_SESSION['role']) && $_SESSION['role'] === 'Admin') {
-              $logo_link = "logout.php?redirect=home"; 
-              $logo_onclick = "return confirm('⚠️ Security Alert:\\n\\nGoing to the Home Page will log you out of the Admin Panel.\\n\\nAre you sure you want to proceed?');";
+          if (isset($is_home_root) && $is_home_root === true) {
+              $path_prefix_root = "";          
+              $path_prefix_module_a = "Module A/"; 
+              $logout_redirect = "index.php";   
+          } else {
+              
+              $path_prefix_root = "../";        
+              $path_prefix_module_a = "";       
+              $logout_redirect = "../index.php";
           }
+          
+          // Logo 逻辑
+          $logo_link = $path_prefix_root . "index.php";
+          // ... (保留你原有的 admin logout 确认逻辑) ...
         ?>
 
         <a class="navbar-brand d-flex align-items-center" href="<?php echo $logo_link; ?>" onclick="<?php echo $logo_onclick; ?>">
@@ -90,40 +95,39 @@ if (isset($_SESSION['user_id'])) {
         <div class="d-flex align-items-center">
   
         <?php if ($nav_is_logged_in): ?>
-      
-            <div class="nav-item d-flex align-items-center me-3">
-               <img src="<?php echo $nav_profile_pic; ?>" alt="User" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover; border: 2px solid white;" />
+             <div class="nav-item d-flex align-items-center me-3">
+               <?php 
+                 $display_pfp = $nav_profile_pic;
+                 if(isset($is_home_root) && $is_home_root) {
+                    // 如果头像是默认的 default.png 且不在 uploads/ 下，可能需要特殊处理，
+                    // 但通常数据库存的是文件名。这里假设 uploads 文件夹在 Module A 下。
+                    if (strpos($nav_profile_pic, 'uploads/') === 0) {
+                        $display_pfp = "Module A/" . $nav_profile_pic;
+                    }
+                 }
+               ?>
+               <img src="<?php echo $display_pfp; ?>" alt="User" class="rounded-circle me-2" style="width: 32px; height: 32px; object-fit: cover; border: 2px solid white;" />
                <span class="text-white d-none d-sm-block"><?php echo $nav_user_name; ?></span>
             </div>
 
             <?php if (isset($_SESSION['role']) && $_SESSION['role'] === 'Admin'): ?>
-               <a class="btn btn-warning btn-sm me-2 fw-bold" href="admin_dashboard.php" title="Go to Admin Dashboard">
+               <a class="btn btn-warning btn-sm me-2 fw-bold" href="<?php echo $path_prefix_root; ?>Module C/admin_dashboard.php" title="Go to Admin Dashboard">
                   <i class="bi bi-speedometer2"></i> Dashboard
                </a>
             <?php endif; ?>
 
-            <?php
-                // if normal user, just normal logout
-                $logout_url = "logout.php";
-                $logout_attr = "";
-
-                // if admin user, add redirect and confirmation
-                if (isset($_SESSION['role']) && $_SESSION['role'] === 'Admin') {
-                    // redirect to home after logout (module C)
-                    $logout_url = "logout.php?redirect=home";
-                    $logout_attr = "onclick=\"return confirm('⚠️ Confirm Logout:\\n\\nAre you sure you want to log out of the Admin Panel?');\"";
-                }
-            ?>
-            <a class="btn btn-outline-light btn-sm" href="<?php echo $logout_url; ?>" <?php echo $logout_attr; ?>>Sign out</a>
+            <a class="btn btn-outline-light btn-sm" href="<?php echo $path_prefix_module_a; ?>logout.php" <?php echo $logout_attr; ?>>Sign out</a>
   
         <?php else: ?>
             
             <?php if (!in_array($current_page, $auth_pages)): ?>
-              <a class="btn btn-outline-light btn-sm me-2" href="login.php">Login</a>
-              <a class="btn btn-warning btn-sm" href="register.php">Sign Up</a>
+              <a class="btn btn-outline-light btn-sm me-2" href="<?php echo $path_prefix_module_a; ?>login.php">Login</a>
+              <a class="btn btn-warning btn-sm" href="<?php echo $path_prefix_module_a; ?>register.php">Sign Up</a>
             <?php endif; ?>
       
         <?php endif; ?>
+
+        </div>
 
         </div>
       </div>

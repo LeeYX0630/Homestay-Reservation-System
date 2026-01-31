@@ -6,7 +6,7 @@ if (session_status() === PHP_SESSION_NONE) {
 
 // 1. GATEKEEPER: Check if user is already logged in
 if (isset($_SESSION['user_id'])) {
-    require_once 'db_connection.php';
+    require_once '../includes/db_connection.php';
     
     // Determine redirect link based on role
     $dashboard_link = (isset($_SESSION['role']) && $_SESSION['role'] === 'Admin') ? 'admin_dashboard.php' : 'user_dashboard.php';
@@ -60,7 +60,7 @@ if (isset($_SESSION['user_id'])) {
 }
 
 // 2. REGISTRATION LOGIC: Only for guests
-require_once 'db_connection.php';
+require_once '../includes/db_connection.php';
 
 $error = "";
 $success = "";
@@ -111,7 +111,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 $page_title = "Register - Homestay";
-include_once 'header.php'; 
+include_once '../includes/header.php'; 
 ?>
 
 <div class="container mt-5 mb-5">
@@ -219,5 +219,5 @@ include_once 'header.php';
 </script>
 
 <?php 
-include_once 'footer.php'; 
+include_once '../includes/footer.php'; 
 ?>

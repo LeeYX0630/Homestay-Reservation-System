@@ -1,11 +1,11 @@
 <?php
 // for admin login
 session_start();
-require_once 'db_connection.php';
+require_once '../includes/db_connection.php';
 
 // If already logged in as Admin, redirect to dashboard
 if (isset($_SESSION['user_id']) && isset($_SESSION['role']) && $_SESSION['role'] === 'Admin') {
-    header("Location: admin_dashboard.php");
+    header("Location: ../Module C/admin_dashboard.php");
     exit();
 }
 
@@ -33,7 +33,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $_SESSION['user_id'] = $row['user_id'];
             $_SESSION['user_name'] = $row['full_name'];
             $_SESSION['role'] = 'Admin';
-            header("Location: admin_dashboard.php");
+            header("Location: ../Module C/admin_dashboard.php");
             exit();
         } else {
             $error = "Invalid Password.";
@@ -46,7 +46,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 $page_title = "Admin Login - Homestay";
-include_once 'header.php'; 
+include_once '../includes/header.php'; 
 ?>
 
 <div class="container mt-5 mb-5">
@@ -110,5 +110,5 @@ include_once 'header.php';
 </div>
 
 <?php 
-include_once 'footer.php'; 
+include_once '../includes/footer.php'; 
 ?>

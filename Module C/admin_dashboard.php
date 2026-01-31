@@ -91,7 +91,7 @@ $recent_orders = $conn->query($sql_recent);
       </button>
       <div class="navbar-nav">
         <div class="nav-item text-nowrap">
-          <a class="nav-link px-3" href="../logout.php">Sign out</a>
+          <a class="nav-link px-3" href="../Module A/logout.php?redirect=home">Sign out</a>
         </div>
       </div>
     </header>
@@ -108,7 +108,7 @@ $recent_orders = $conn->query($sql_recent);
                 </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="admin_manage_booking.php">
+                <a class="nav-link" href="admin_manage_bookings.php">
                   <i class="bi bi-file-earmark-text me-2"></i> Manage Bookings
                 </a>
               </li>
@@ -253,7 +253,7 @@ $recent_orders = $conn->query($sql_recent);
                         ?>
                       </td>
                       <td>
-                          <a href="admin_manage_booking.php" class="btn btn-sm btn-outline-primary">Manage</a>
+                          <a href="admin_manage_bookings.php?booking_id=<?php echo $row['booking_id']; ?>" class="btn btn-sm btn-outline-primary">Manage</a>
                       </td>
                     </tr>
                     <?php endwhile; ?>

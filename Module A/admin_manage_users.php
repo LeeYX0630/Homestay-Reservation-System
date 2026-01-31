@@ -1,7 +1,7 @@
 <?php
 // for admin to manage user
 session_start();
-require_once 'db_connection.php';
+require_once '../includes/db_connection.php';
 
 // 1. Safety check: must be Admin
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
@@ -22,7 +22,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 $result = $conn->query($sql);
 
 $page_title = "User Management";
-include 'header.php';
+include '../includes/header.php';
 ?>
 
 <div class="container mt-5 mb-5">

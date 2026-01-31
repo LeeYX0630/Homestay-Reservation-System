@@ -1,7 +1,7 @@
 <?php
 // for reset password
 session_start();
-require_once 'db_connection.php';
+require_once '../includes/db_connection.php';
 
 $error = "";
 $token = "";
@@ -58,7 +58,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['token'])) {
 }
 
 $page_title = "Reset Password";
-include_once 'header.php'; 
+include_once '../includes/header.php'; 
 ?>
 
 <div class="container mt-5 mb-5">
@@ -119,4 +119,4 @@ include_once 'header.php';
     </div>
 </div>
 
-<?php include_once 'footer.php'; ?>
+<?php include_once '../includes/footer.php'; ?>

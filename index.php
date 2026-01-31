@@ -107,29 +107,17 @@ $result = $conn->query($sql);
 </head>
 <body>
 
-    <nav>
-        <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;">
-            <div style="color: #F5F5F5; font-size: 24px; font-weight: bold;">HomestaySystem</div>
-            <div>
-                <a href="index.php">Home</a>
-                <a href="room_catalogue.php">Rooms</a>
-                <a href="about_us.php">About Us</a>
-                
-                <?php if(isset($_SESSION['user_id'])): ?>
-                    <a href="user_dashboard.php" style="color: #4CAF50;">Hi, <?php echo htmlspecialchars($_SESSION['full_name']); ?></a>
-                    <a href="logout.php">Logout</a>
-                <?php else: ?>
-                    <a href="login.php">Login</a>
-                    <a href="register.php">Sign Up</a>
-                <?php endif; ?>
-            </div>
-        </div>
-    </nav>
+<?php
+$page_title = "Home";
+$is_home_root = true; 
+
+include 'includes/header.php';
+?>
 
     <div class="hero-section">
         <h1>Welcome to Your Perfect Getaway</h1>
         <p style="font-size: 1.2em; margin-bottom: 40px;">Experience comfort and luxury at affordable prices.</p>
-        <a href="room_catalogue.php" class="cta-button">Book Now</a>
+        <a href="Module C/check_availability.php" class="cta-button">Book Now</a>
     </div>
 
     <div class="featured-container">
@@ -149,7 +137,7 @@ $result = $conn->query($sql);
                             <h3>'.$row['room_name'].'</h3>
                             <p class="price">RM '.$row['price_per_night'].' / night</p>
                             <p>'.substr($row['description'], 0, 100).'...</p>
-                            <a href="room_details.php?id='.$row['room_id'].'" style="color: #333333; font-weight: bold;">View Details &rarr;</a>
+                            <a href="Module C/check_availability.php?room_id='.$row['room_id'].'">View Details &rarr;</a>
                         </div>
                     </div>
                     ';
@@ -161,9 +149,9 @@ $result = $conn->query($sql);
         </div>
     </div>
 
-    <footer style="background: #333; color: #fff; text-align: center; padding: 20px; margin-top: 50px;">
-        <p>&copy; 2026 Homestay Reservation System. All Rights Reserved.</p>
-    </footer>
+<?php 
+include_once 'includes/footer.php'; 
+?>
 
 </body>
 </html>
