@@ -3,7 +3,7 @@
 session_start();
 
 // 1. 引入数据库连接 (根据文档开发规范 [cite: 346])
-require_once 'db_connection.php';
+require_once 'includes/db_connection.php';
 
 // 2. 获取 "推荐房源" (Must Have: 推荐展示 )
 // 这里我们简单地取数据库里的前 3 个房间作为推荐
@@ -138,7 +138,6 @@ $result = $conn->query($sql);
         <div class="room-grid">
             <?php
             if ($result->num_rows > 0) {
-                // 循环输出数据库中的房间
                 while($row = $result->fetch_assoc()) {
                     // 处理图片路径，如果没有图片则使用默认占位符
                     $img_path = !empty($row['room_image']) ? "uploads/" . $row['room_image'] : "images/placeholder.jpg";
