@@ -22,7 +22,7 @@ $result = $conn->query($sql);
     <style>
         /* Hero Banner 区域 */
         .hero-section {
-            background-color: #333333; /* 配合导航栏的主色调 */
+            background-color: #333333;
             color: #F5F5F5;
             padding: 100px 20px;
             text-align: center;
@@ -48,7 +48,6 @@ $result = $conn->query($sql);
             background-color: #ec971f;
         }
 
-        /* 推荐房源区域 */
         .featured-container {
             max-width: 1200px;
             margin: 50px auto;
@@ -71,7 +70,7 @@ $result = $conn->query($sql);
         .room-card {
             background: white;
             border: 1px solid #ddd;
-            width: 30%; /* 一行显示三个 */
+            width: 30%;
             box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             transition: transform 0.3s;
         }
@@ -84,7 +83,7 @@ $result = $conn->query($sql);
             width: 100%;
             height: 200px;
             object-fit: cover;
-            background-color: #eee; /* 图片加载前的占位色 */
+            background-color: #eee;
         }
 
         .room-info {

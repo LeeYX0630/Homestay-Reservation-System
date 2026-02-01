@@ -91,7 +91,10 @@ $recent_orders = $conn->query($sql_recent);
       </button>
       <div class="navbar-nav">
         <div class="nav-item text-nowrap">
-          <a class="nav-link px-3" href="../Module A/logout.php?redirect=home">Sign out</a>
+          <div class="nav-item text-nowrap">
+            <a class="nav-link px-3" href="../Module%20A/logout.php?redirect=home" onclick="return confirm('Are you sure you want to sign out from Admin Panel?');">Sign out
+    </a>
+</div>
         </div>
       </div>
     </header>

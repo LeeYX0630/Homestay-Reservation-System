@@ -1,17 +1,15 @@
 <?php
-// for logout
+// Module A/logout.php
 session_start();
 
-// Check if we need to redirect to Home (index.php) instead of Login
-$redirect_to = "login.php"; // Default
-if (isset($_GET['redirect']) && $_GET['redirect'] == 'home') {
-    $redirect_to = "index.php?msg=logged_out";
-}
+$redirect_to = "login.php"; 
 
-// 1. Clear all session variables
+if (isset($_GET['redirect']) && $_GET['redirect'] == 'home') {
+    // 【关键修复】加上 ../ 回到根目录的 index.php
+    $redirect_to = "../index.php?msg=logged_out";
+}
 $_SESSION = array();
 
-// 2. Delete the session cookie
 if (ini_get("session.use_cookies")) {
     $params = session_get_cookie_params();
     setcookie(session_name(), '', time() - 42000,
@@ -20,10 +18,8 @@ if (ini_get("session.use_cookies")) {
     );
 }
 
-// 3. Destroy the session
 session_destroy();
 
-// 4. Redirect
 header("Location: " . $redirect_to);
 exit();
 ?>

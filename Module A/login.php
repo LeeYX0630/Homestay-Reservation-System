@@ -42,10 +42,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         // Only allow Customer role to login here
         else {
             if (password_verify($password, $row['password'])) {
-                // Login Success
+                // Login Success   
+                unset($_SESSION['admin_id']);
+                unset($_SESSION['username']);
+
                 $_SESSION['user_id'] = $row['user_id'];
                 $_SESSION['user_name'] = $row['full_name'];
-                $_SESSION['role'] = 'Customer'; // 强制确认为 Customer
+                $_SESSION['role'] = 'Customer'; 
 
                 // Remember Me Logic
                 if (isset($_POST["remember"])) {

@@ -1,11 +1,19 @@
 <?php
-// module_c/check_availability.php - 最终完整版
-// 包含：强制登录自动回跳 + 日历显示 + 重复预订二次确认
+// module_c/check_availability.php
 session_start();
 require_once '../includes/db_connection.php';
 
-// 1. 获取 room_id (放在最前面，因为登录跳转需要用到)
+// 1. 获取 room_id
 $room_id = isset($_GET['room_id']) ? intval($_GET['room_id']) : 0;
+
+// --- 【新增】Admin 拦截逻辑 ---
+if (isset($_SESSION['admin_id'])) {
+    echo "<script>
+            alert('⚠️ Administrator Access Restriction:\\n\\nAdmins cannot book rooms directly.\\nPlease log out and sign in with a Customer account to make a booking.');            
+            window.location.href='../Module C/admin_dashboard.php';
+          </script>";
+    exit();
+}
 
 // 2. 强制登录检查 (带回跳参数 redirect)
 if (!isset($_SESSION['user_id'])) {
