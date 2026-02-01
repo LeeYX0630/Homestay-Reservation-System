@@ -57,8 +57,10 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                    VALUES ('$user_id', '$room_id', '$check_in', '$check_out', '$total_price', 'confirmed', 'paid')";
 
     if ($conn->query($sql_insert) === TRUE) {
-        // [修改 2] 成功后跳转回上一级的 index.php
-        echo "<script>alert('Payment Successful! Your booking is confirmed.'); window.location.href='../index.php';</script>";
+        echo "<script>
+                alert('Payment Successful! Your booking is confirmed.'); 
+                window.location.href='../Module A/user_dashboard.php'; 
+              </script>";
         exit();
     } else {
         $msg = "<div class='alert error'>Error: " . $conn->error . "</div>";

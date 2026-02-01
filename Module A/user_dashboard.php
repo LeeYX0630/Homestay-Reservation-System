@@ -115,12 +115,72 @@ include '../includes/header.php';
             </form>
         </div>
         
-        <div class="card p-4 shadow-sm border-0 rounded-4">
+<div class="card p-4 shadow-sm border-0 rounded-4">
             <h5 class="mb-3 fw-bold">Booking History</h5>
-            <div class="alert alert-light border">
-                <i class="bi bi-info-circle-fill text-warning"></i> 
-                Currently, no booking data is available. (Module C Integration Pending)
-            </div>
+            
+            <?php
+            // 1. 查询当前用户的订单 (关联 rooms 表获取房间名)
+            // 注意：根据你的数据库表结构，bookings 表里应该有 room_id, user_id, total_price, status 等字段
+            $book_sql = "SELECT b.*, r.room_name, r.room_image 
+                         FROM bookings b 
+                         JOIN rooms r ON b.room_id = r.room_id 
+                         WHERE b.user_id = '$user_id' 
+                         ORDER BY b.booking_id DESC";
+            $book_res = $conn->query($book_sql);
+            ?>
+
+            <?php if ($book_res && $book_res->num_rows > 0): ?>
+                <div class="table-responsive">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Booking ID</th>
+                                <th>Room</th>
+                                <th>Check-in / Out</th>
+                                <th>Total Price</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php while($booking = $book_res->fetch_assoc()): ?>
+                                <tr>
+                                    <td><span class="text-muted">#<?php echo $booking['booking_id']; ?></span></td>
+                                    <td>
+                                        <div class="d-flex align-items-center">
+                                            <?php $r_img = !empty($booking['room_image']) ? "../uploads/".$booking['room_image'] : "../images/placeholder.jpg"; ?>
+                                            <img src="<?php echo $r_img; ?>" style="width:50px; height:40px; object-fit:cover; border-radius:4px; margin-right:10px;">
+                                            <span class="fw-bold"><?php echo htmlspecialchars($booking['room_name']); ?></span>
+                                        </div>
+                                    </td>
+                                    <td>
+                                        <small class="d-block text-success"><i class="bi bi-box-arrow-in-right"></i> <?php echo $booking['check_in_date']; ?></small>
+                                        <small class="d-block text-danger"><i class="bi bi-box-arrow-right"></i> <?php echo $booking['check_out_date']; ?></small>
+                                    </td>
+                                    <td class="fw-bold">RM <?php echo number_format($booking['total_price'], 2); ?></td>
+                                    <td>
+                                        <?php 
+                                            // 根据状态显示不同颜色的标签
+                                            $status = $booking['booking_status']; 
+                                            $badge_color = 'bg-secondary';
+                                            if($status == 'confirmed') $badge_color = 'bg-success';
+                                            if($status == 'cancelled') $badge_color = 'bg-danger';
+                                            if($status == 'pending') $badge_color = 'bg-warning text-dark';
+                                        ?>
+                                        <span class="badge <?php echo $badge_color; ?>"><?php echo ucfirst($status); ?></span>
+                                    </td>
+                                </tr>
+                            <?php endwhile; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php else: ?>
+                <div class="alert alert-light border text-center py-4">
+                    <i class="bi bi-calendar-x text-muted" style="font-size: 2rem;"></i>
+                    <p class="mt-2 text-muted">You haven't made any bookings yet.</p>
+                    <a href="../index.php" class="btn btn-dark btn-sm mt-2">Browse Rooms</a>
+                </div>
+            <?php endif; ?>
+            
         </div>
     </div>
   </div>
