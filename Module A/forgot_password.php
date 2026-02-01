@@ -9,7 +9,7 @@ $success_link = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email']);
     
-    // 检查邮箱
+    // check email exists
     $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
@@ -18,7 +18,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($result->num_rows > 0) {
         $token = bin2hex(random_bytes(32));
         
-        // ⭐ 关键修改：让 MySQL 自己计算 "1小时后" 的时间，解决时区问题
+        // let MySQL store the token and expiry time
         $update = $conn->prepare("UPDATE users SET reset_token = ?, reset_token_expiry = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE email = ?");
         $update->bind_param("ss", $token, $email);
         

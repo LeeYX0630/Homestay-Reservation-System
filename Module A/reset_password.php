@@ -5,9 +5,9 @@ require_once '../includes/db_connection.php';
 
 $error = "";
 $token = "";
-$token_valid = false; //remark whether token is valid
+$token_valid = false; // remark whether token is valid
 
-// 1. Token Validation
+// 1. Token Validation (GET Request)
 if (isset($_GET['token'])) {
     $token = $_GET['token'];
     // Check token expired or not
@@ -21,7 +21,7 @@ if (isset($_GET['token'])) {
     }
 } 
 
-// 2. Process new password
+// 2. Process new password (POST Request)
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['token'])) {
     $token = $_POST['token'];
     $pass1 = $_POST['password'];
@@ -33,12 +33,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['token'])) {
     $stmt->execute();
     
     if ($stmt->get_result()->num_rows === 1) {
+        $token_valid = true; 
+
         if ($pass1 !== $pass2) {
             $error = "Passwords do not match.";
-            $token_valid = true; 
         } elseif (strlen($pass1) < 6) {
             $error = "Password must be at least 6 characters.";
-            $token_valid = true;
         } else {
             $hashed_password = password_hash($pass1, PASSWORD_DEFAULT);
             // Update password and clear token
@@ -63,7 +63,7 @@ include_once '../includes/header.php';
 
 <div class="container mt-5 mb-5">
     <div class="row justify-content-center">
-        <div class="col-md-10 col-lg-8">
+        <div class="col-md-11 col-lg-10">
             <div class="card shadow-lg border-0 rounded-4">
                 <div class="card-body p-5"> 
                     
@@ -90,12 +90,17 @@ include_once '../includes/header.php';
                         <form method="POST" action="">
                             <input type="hidden" name="token" value="<?php echo htmlspecialchars($token); ?>">
 
-                            <div class="mb-4">
+                            <div class="mb-1">
                                 <label class="form-label fw-bold small text-secondary">New Password</label>
                                 <div class="input-group">
                                     <span class="input-group-text bg-light border-0 px-3"><i class="bi bi-key fs-5"></i></span>
-                                    <input type="password" name="password" class="form-control form-control-lg bg-light border-0 py-3" required>
+                                    <input type="password" name="password" id="passwordInput" class="form-control form-control-lg bg-light border-0 py-3" required>
                                 </div>
+                            </div>
+
+                            <div class="mb-4 d-flex align-items-center mt-2">
+                                <small class="text-muted me-2">Strength:</small> 
+                                <span id="strengthText" class="fw-bold small text-muted">Enter password...</span>
                             </div>
 
                             <div class="mb-5">
@@ -118,5 +123,44 @@ include_once '../includes/header.php';
         </div>
     </div>
 </div>
+
+<script>
+    const passwordInput = document.getElementById('passwordInput');
+    const strengthText = document.getElementById('strengthText');
+
+    if (passwordInput) {
+        passwordInput.addEventListener('input', function() {
+            const val = passwordInput.value;
+            let strength = 0;
+
+            // 1. Length Check
+            if (val.length >= 6) strength += 1;
+            if (val.length >= 10) strength += 1;
+
+            // 2. Complexity Check
+            if (/[0-9]/.test(val)) strength += 1; // Numbers
+            if (/[A-Z]/.test(val)) strength += 1; // Uppercase
+            if (/[^A-Za-z0-9]/.test(val)) strength += 1; // Symbols
+
+            // 3. Output Status
+            if (val.length === 0) {
+                strengthText.textContent = "Enter password...";
+                strengthText.className = "fw-bold small text-muted";
+            } else if (val.length < 6) {
+                strengthText.textContent = "Too Short 🔴";
+                strengthText.className = "fw-bold small text-danger";
+            } else if (strength < 3) {
+                strengthText.textContent = "Weak 🔴";
+                strengthText.className = "fw-bold small text-danger";
+            } else if (strength === 3 || strength === 4) {
+                strengthText.textContent = "Medium 🟠";
+                strengthText.className = "fw-bold small text-warning";
+            } else {
+                strengthText.textContent = "Strong 🟢";
+                strengthText.className = "fw-bold small text-success";
+            }
+        });
+    }
+</script>
 
 <?php include_once '../includes/footer.php'; ?>
