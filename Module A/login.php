@@ -126,9 +126,12 @@ include_once '../includes/header.php';
                     </form>
                     
                     <div class="text-center mt-5 pt-3 border-top">
-                        <p class="text-muted">Don't have an account? 
+                        <p class="text-muted mb-2">Don't have an account? 
                             <a href="register.php" class="text-warning fw-bold text-decoration-none">Sign Up Here</a>
                         </p>
+                        <a href="admin_login.php" class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                            <i class="bi bi-shield-lock me-1"></i> Admin Portal
+                        </a>
                     </div>
 
                 </div>
