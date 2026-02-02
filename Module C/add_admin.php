@@ -14,24 +14,30 @@ $msg = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']); 
+    // 【新增】获取电话
+    $phone = trim($_POST['phone']);
     $full_name = trim($_POST['full_name']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
     
     $role = 'admin'; 
 
-    // 1. 基本验证
-    if (empty($username) || empty($email) || empty($password) || empty($full_name)) {
+    // 1. 验证逻辑
+    if (empty($username) || empty($email) || empty($phone) || empty($password) || empty($full_name)) {
         $msg = "<div class='alert error'>All fields are required.</div>";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $msg = "<div class='alert error'>Invalid email format.</div>";
-    } elseif (strlen($password) < 6) {
-        // 【新增】后端强制检查长度
+    } 
+    // 【新增】电话号码验证 (必须是 9-15 位数字)
+    elseif (!preg_match('/^[0-9]{9,15}$/', $phone)) {
+        $msg = "<div class='alert error'>Invalid phone number (Digits only).</div>";
+    }
+    elseif (strlen($password) < 6) {
         $msg = "<div class='alert error'>Password must be at least 6 characters long.</div>";
     } elseif ($password !== $confirm_password) {
         $msg = "<div class='alert error'>Passwords do not match.</div>";
     } else {
-        // 2. 检查用户名 OR 邮箱是否已存在
+        // 2. 查重 (Username 或 Email 是否已存在)
         $check_sql = "SELECT admin_id FROM admins WHERE username = ? OR email = ?";
         $stmt = $conn->prepare($check_sql);
         $stmt->bind_param("ss", $username, $email);
@@ -41,13 +47,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($stmt->num_rows > 0) {
             $msg = "<div class='alert error'>Username or Email already taken.</div>";
         } else {
-            // 3. 密码加密
+            // 3. 插入数据
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-            // 4. 插入数据库
-            $insert_sql = "INSERT INTO admins (username, email, password, full_name, role) VALUES (?, ?, ?, ?, ?)";
+            // 【修改】SQL 语句加入 phone
+            $insert_sql = "INSERT INTO admins (username, email, phone, password, full_name, role) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($insert_sql);
-            $stmt->bind_param("sssss", $username, $email, $hashed_password, $full_name, $role);
+            
+            // 【修改】ssssss (6个参数)
+            $stmt->bind_param("ssssss", $username, $email, $phone, $hashed_password, $full_name, $role);
 
             if ($stmt->execute()) {
                 $msg = "<div class='alert success'>New Admin ($username) added successfully!</div>";
@@ -84,14 +92,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .back-link { display: block; text-align: center; margin-top: 20px; text-decoration: none; color: #666; font-size: 14px; }
         .back-link:hover { color: #333; text-decoration: underline; }
 
-        /* --- 【新增】密码强度样式 --- */
+        /* 密码强度样式 */
         .strength-container { margin-top: 8px; height: 5px; background-color: #eee; border-radius: 3px; overflow: hidden; display: flex;}
         .strength-bar { height: 100%; width: 0%; transition: width 0.3s ease, background-color 0.3s ease; }
         .strength-text { font-size: 12px; margin-top: 5px; font-weight: bold; display: block; text-align: right; }
-        
-        .strength-weak { background-color: #dc3545; }   /* 红 */
-        .strength-medium { background-color: #ffc107; } /* 黄 */
-        .strength-strong { background-color: #28a745; } /* 绿 */
+        .strength-weak { background-color: #dc3545; }
+        .strength-medium { background-color: #ffc107; }
+        .strength-strong { background-color: #28a745; }
     </style>
 </head>
 <body>
@@ -103,17 +110,26 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <form method="POST">
         <div class="form-group">
             <label>Full Name (Position)</label>
-            <input type="text" name="full_name" required placeholder="e.g. John Manager">
+            <input type="text" name="full_name" required placeholder="e.g. John Manager" value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>">
         </div>
 
         <div class="form-group">
             <label>Username</label>
-            <input type="text" name="username" required placeholder="For display purpose">
+            <input type="text" name="username" required placeholder="For display purpose" value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>">
         </div>
 
         <div class="form-group">
             <label>Email Address (For Login)</label>
-            <input type="email" name="email" required placeholder="admin@homestay.com">
+            <input type="email" name="email" required placeholder="admin@homestay.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+        </div>
+
+        <div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" name="phone" required placeholder="e.g. 0123456789" 
+                   maxlength="15" 
+                   oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                   value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>">
+            <small style="color:#666; font-size:0.8em;">* Digits only</small>
         </div>
 
         <div class="form-group">
@@ -138,6 +154,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </div>
 
 <script>
+    // 密码强度检测脚本 (保持不变)
     const passwordInput = document.getElementById('passwordInput');
     const strengthBar = document.getElementById('strengthBar');
     const strengthText = document.getElementById('strengthText');
@@ -146,46 +163,36 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         const val = passwordInput.value;
         let score = 0;
 
-        // 1. 基础长度加分
         if (val.length >= 6) score += 1;
         if (val.length >= 10) score += 1;
+        if (/[A-Z]/.test(val)) score += 1;
+        if (/[0-9]/.test(val)) score += 1;
+        if (/[^A-Za-z0-9]/.test(val)) score += 1;
 
-        // 2. 复杂度加分
-        if (/[A-Z]/.test(val)) score += 1; // 包含大写
-        if (/[0-9]/.test(val)) score += 1; // 包含数字
-        if (/[^A-Za-z0-9]/.test(val)) score += 1; // 包含特殊符号
-
-        // 3. 更新 UI
-        // 重置类名
         strengthBar.className = 'strength-bar';
         strengthText.textContent = '';
 
         if (val.length === 0) {
             strengthBar.style.width = '0%';
         } else if (val.length < 6) {
-            // 太短
             strengthBar.style.width = '20%';
             strengthBar.classList.add('strength-weak');
             strengthText.textContent = 'Too Short';
             strengthText.style.color = '#dc3545';
         } else if (score < 3) {
-            // 弱 (长度够但太简单)
             strengthBar.style.width = '40%';
             strengthBar.classList.add('strength-weak');
-            strengthText.textContent = 'Weak (Password too short (less than 6 characters) or all numbers/all letters)';
+            strengthText.textContent = 'Weak';
             strengthText.style.color = '#dc3545';
         } else if (score === 3 || score === 4) {
-            // 中等
             strengthBar.style.width = '70%';
             strengthBar.classList.add('strength-medium');
-            strengthText.textContent = 'Medium (Moderate length, containing a mix of numbers and letters)';
-            strengthText.style.color = '#ffc107'; // bootstrap warning color (darker yellow)
-            strengthText.style.color = '#d39e00'; // visually better on white
+            strengthText.textContent = 'Medium';
+            strengthText.style.color = '#d39e00'; 
         } else {
-            // 强
             strengthBar.style.width = '100%';
             strengthBar.classList.add('strength-strong');
-            strengthText.textContent = 'Strong (The length exceeds 10 characters and contains uppercase letters, symbols)';
+            strengthText.textContent = 'Strong';
             strengthText.style.color = '#28a745';
         }
     });
