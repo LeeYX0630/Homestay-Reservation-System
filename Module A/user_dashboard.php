@@ -47,7 +47,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
 }
 
-// 4. Fetch user data
 $user_res = $conn->query("SELECT * FROM users WHERE user_id='$user_id'");
 $user = $user_res->fetch_assoc();
 $profile_pic = !empty($user['profile_image']) ? "uploads/".$user['profile_image'] : "uploads/default.png";
@@ -55,6 +54,25 @@ $profile_pic = !empty($user['profile_image']) ? "uploads/".$user['profile_image'
 $page_title = "My Dashboard";
 include '../includes/header.php'; 
 ?>
+
+<style>
+    /* 强制限制头像大小，防止撑爆布局 */
+    .profile-img-large {
+        width: 150px;        /* 固定宽度 */
+        height: 150px;       /* 固定高度 */
+        object-fit: cover;   /* 裁剪模式：保证图片不变形，填满圆框 */
+        border-radius: 50%;  /* 变成圆形 (如果想要方形，去掉这行) */
+        border: 4px solid #fff; /* 加个白边，更好看 */
+        box-shadow: 0 5px 15px rgba(0,0,0,0.15); /* 加点阴影 */
+        margin: 0 auto;      /* 居中 */
+        display: block;
+    }
+    
+    /* 让左侧卡片和右侧内容对齐更好 */
+    .card {
+        overflow: hidden; /* 防止内容溢出圆角 */
+    }
+</style>
 
 <div class="container-fluid px-md-5 mt-5 mb-5">
   
@@ -115,12 +133,9 @@ include '../includes/header.php';
             </form>
         </div>
         
-<div class="card p-4 shadow-sm border-0 rounded-4">
+        <div class="card p-4 shadow-sm border-0 rounded-4">
             <h5 class="mb-3 fw-bold">Booking History</h5>
-            
             <?php
-            // 1. 查询当前用户的订单 (关联 rooms 表获取房间名)
-            // 注意：根据你的数据库表结构，bookings 表里应该有 room_id, user_id, total_price, status 等字段
             $book_sql = "SELECT b.*, r.room_name, r.room_image 
                          FROM bookings b 
                          JOIN rooms r ON b.room_id = r.room_id 
@@ -128,7 +143,6 @@ include '../includes/header.php';
                          ORDER BY b.booking_id DESC";
             $book_res = $conn->query($book_sql);
             ?>
-
             <?php if ($book_res && $book_res->num_rows > 0): ?>
                 <div class="table-responsive">
                     <table class="table table-hover align-middle">
@@ -136,8 +150,8 @@ include '../includes/header.php';
                             <tr>
                                 <th>Booking ID</th>
                                 <th>Room</th>
-                                <th>Check-in / Out</th>
-                                <th>Total Price</th>
+                                <th>Dates</th>
+                                <th>Price</th>
                                 <th>Status</th>
                             </tr>
                         </thead>
@@ -153,20 +167,12 @@ include '../includes/header.php';
                                         </div>
                                     </td>
                                     <td>
-                                        <small class="d-block text-success"><i class="bi bi-box-arrow-in-right"></i> <?php echo $booking['check_in_date']; ?></small>
-                                        <small class="d-block text-danger"><i class="bi bi-box-arrow-right"></i> <?php echo $booking['check_out_date']; ?></small>
+                                        <small class="d-block text-success"><?php echo $booking['check_in_date']; ?></small>
+                                        <small class="d-block text-danger"><?php echo $booking['check_out_date']; ?></small>
                                     </td>
                                     <td class="fw-bold">RM <?php echo number_format($booking['total_price'], 2); ?></td>
                                     <td>
-                                        <?php 
-                                            // 根据状态显示不同颜色的标签
-                                            $status = $booking['booking_status']; 
-                                            $badge_color = 'bg-secondary';
-                                            if($status == 'confirmed') $badge_color = 'bg-success';
-                                            if($status == 'cancelled') $badge_color = 'bg-danger';
-                                            if($status == 'pending') $badge_color = 'bg-warning text-dark';
-                                        ?>
-                                        <span class="badge <?php echo $badge_color; ?>"><?php echo ucfirst($status); ?></span>
+                                        <span class="badge bg-success"><?php echo ucfirst($booking['booking_status']); ?></span>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
@@ -174,37 +180,21 @@ include '../includes/header.php';
                     </table>
                 </div>
             <?php else: ?>
-                <div class="alert alert-light border text-center py-4">
-                    <i class="bi bi-calendar-x text-muted" style="font-size: 2rem;"></i>
-                    <p class="mt-2 text-muted">You haven't made any bookings yet.</p>
-                    <a href="../index.php" class="btn btn-dark btn-sm mt-2">Browse Rooms</a>
-                </div>
+                <p class="text-muted">No bookings yet.</p>
             <?php endif; ?>
-            
         </div>
     </div>
   </div>
-
 </div> 
 
 <script>
     function updateClock() {
         const now = new Date();
-        
-        // 1. set time format
-        const timeOptions = { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true };
-        const timeString = now.toLocaleTimeString('en-US', timeOptions);
-        
-        // 2. set date format
-        const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-        const dateString = now.toLocaleDateString('en-US', dateOptions);
-        
-        // 3. update html
+        const timeString = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+        const dateString = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         document.getElementById('live-clock').textContent = timeString;
         document.getElementById('live-date').textContent = dateString;
     }
-
-    // update every second
     setInterval(updateClock, 1000);
     updateClock();
 </script>

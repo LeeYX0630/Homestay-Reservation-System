@@ -14,8 +14,9 @@ $msg = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = trim($_POST['username']);
     $email = trim($_POST['email']); 
-    // 【新增】获取电话
-    $phone = trim($_POST['phone']);
+
+    $raw_phone = trim($_POST['phone']);
+    $phone = str_replace('-', '', $raw_phone);
     $full_name = trim($_POST['full_name']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
@@ -28,16 +29,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $msg = "<div class='alert error'>Invalid email format.</div>";
     } 
-    // 【新增】电话号码验证 (必须是 9-15 位数字)
-    elseif (!preg_match('/^[0-9]{9,15}$/', $phone)) {
-        $msg = "<div class='alert error'>Invalid phone number (Digits only).</div>";
+    elseif (!preg_match('/^[0-9]{9,11}$/', $phone)) {
+        $msg = "<div class='alert error'>Invalid phone number (9-11 digits required).</div>";
     }
     elseif (strlen($password) < 6) {
         $msg = "<div class='alert error'>Password must be at least 6 characters long.</div>";
     } elseif ($password !== $confirm_password) {
         $msg = "<div class='alert error'>Passwords do not match.</div>";
     } else {
-        // 2. 查重 (Username 或 Email 是否已存在)
         $check_sql = "SELECT admin_id FROM admins WHERE username = ? OR email = ?";
         $stmt = $conn->prepare($check_sql);
         $stmt->bind_param("ss", $username, $email);
@@ -47,14 +46,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($stmt->num_rows > 0) {
             $msg = "<div class='alert error'>Username or Email already taken.</div>";
         } else {
-            // 3. 插入数据
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-            // 【修改】SQL 语句加入 phone
             $insert_sql = "INSERT INTO admins (username, email, phone, password, full_name, role) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($insert_sql);
             
-            // 【修改】ssssss (6个参数)
             $stmt->bind_param("ssssss", $username, $email, $phone, $hashed_password, $full_name, $role);
 
             if ($stmt->execute()) {
@@ -92,7 +88,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .back-link { display: block; text-align: center; margin-top: 20px; text-decoration: none; color: #666; font-size: 14px; }
         .back-link:hover { color: #333; text-decoration: underline; }
 
-        /* 密码强度样式 */
         .strength-container { margin-top: 8px; height: 5px; background-color: #eee; border-radius: 3px; overflow: hidden; display: flex;}
         .strength-bar { height: 100%; width: 0%; transition: width 0.3s ease, background-color 0.3s ease; }
         .strength-text { font-size: 12px; margin-top: 5px; font-weight: bold; display: block; text-align: right; }
@@ -123,13 +118,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <input type="email" name="email" required placeholder="admin@homestay.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
         </div>
 
-        <div class="form-group">
+<div class="form-group">
             <label>Phone Number</label>
-            <input type="tel" name="phone" required placeholder="e.g. 0123456789" 
-                   maxlength="15" 
-                   oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+            <input type="tel" name="phone" id="phoneInput" required placeholder="e.g. 012-3456789" 
+                   maxlength="12" 
                    value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>">
-            <small style="color:#666; font-size:0.8em;">* Digits only</small>
+            <small style="color:#666; font-size:0.8em;">* Format: 01x-xxxxxxx</small>
         </div>
 
         <div class="form-group">
@@ -154,7 +148,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </div>
 
 <script>
-    // 密码强度检测脚本 (保持不变)
+    // --- 自动格式化电话号码 (012-3456789) ---
+    const phoneInput = document.getElementById('phoneInput');
+
+    phoneInput.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        
+        if (value.length > 11) value = value.slice(0, 11);
+
+        if (value.length > 3) {
+            value = value.slice(0, 3) + '-' + value.slice(3);
+        }
+
+        e.target.value = value;
+    });
+
     const passwordInput = document.getElementById('passwordInput');
     const strengthBar = document.getElementById('strengthBar');
     const strengthText = document.getElementById('strengthText');
