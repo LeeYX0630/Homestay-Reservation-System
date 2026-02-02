@@ -140,6 +140,11 @@ $recent_orders = $conn->query($sql_recent);
                   <i class="bi bi-tags me-2"></i> Room Categories
                 </a>
               </li>
+              <li class="nav-item">
+                <a class="nav-link text-dark" href="admin_manage_vouchers.php">
+                  <i class="bi bi-ticket-perforated me-2"></i> Manage Vouchers
+                </a>
+              </li>
             </ul>
 
             <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-3 mb-1 text-muted text-uppercase">

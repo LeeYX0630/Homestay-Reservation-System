@@ -1,66 +1,156 @@
 <?php
-// module_c/checkout_payment.php - 结账与订单生成
+// module_c/checkout_payment.php - 智能折扣推荐版
 session_start();
-
-// [修改 1] 引入上一级目录的数据库连接文件
 require_once '../includes/db_connection.php';
 
-// --- 1. 接收参数与计算逻辑 ---
-// 从上一页 (check_availability.php) 获取参数
+// --- 1. 基础验证与数据获取 ---
 $room_id = isset($_GET['room_id']) ? intval($_GET['room_id']) : 0;
 $check_in = isset($_GET['check_in']) ? $_GET['check_in'] : '';
 $check_out = isset($_GET['check_out']) ? $_GET['check_out'] : '';
 
-// 简单的防呆：如果直接访问这个页面没有参数，跳回首页
 if ($room_id == 0 || empty($check_in) || empty($check_out)) {
-    // [逻辑确认] 跳回上一级的 index.php
     header("Location: ../index.php");
     exit();
 }
 
-// 获取房间单价
+if (!isset($_SESSION['user_id'])) {
+    header("Location: ../Module A/login.php");
+    exit();
+}
+$user_id = $_SESSION['user_id'];
+
+// 获取房间
 $sql_room = "SELECT * FROM rooms WHERE room_id = $room_id";
 $result_room = $conn->query($sql_room);
-
-if ($result_room->num_rows == 0) {
-    die("Room not found.");
-}
-
+if ($result_room->num_rows == 0) die("Room not found.");
 $room = $result_room->fetch_assoc();
 
-// 计算天数
+// 计算总价
 $date1 = new DateTime($check_in);
 $date2 = new DateTime($check_out);
 $interval = $date1->diff($date2);
-$days = $interval->days;
+$days = $interval->days == 0 ? 1 : $interval->days;
+$original_total = $room['price_per_night'] * $days;
 
-// 如果天数为0（例如同一天），至少算1晚
-if ($days == 0) $days = 1;  // <--- 关键：这里必须有分号
+// 初始化变量
+$discount_amount = 0;
+$final_total = $original_total;
+$coupon_msg = "";
+$applied_coupon_code = ""; 
 
-// 计算总价 (注意变量名用小写 total_price)
-$total_price = $room['price_per_night'] * $days;
+// --- 2. 【智能核心】获取优惠券并计算“最优解” ---
+$my_coupons = []; // 存入数组方便多次使用
+$best_coupon_code = "";
+$max_potential_discount = 0;
 
-// --- 2. 处理支付提交 (Must Have: 生成订单) ---
-$msg = "";
-if ($_SERVER["REQUEST_METHOD"] == "POST") {
+$sql_get_coupons = "SELECT c.code, c.discount_value, c.discount_type, c.min_spend
+                    FROM user_coupons uc 
+                    JOIN coupons c ON uc.coupon_id = c.coupon_id 
+                    WHERE uc.user_id = '$user_id' 
+                    AND uc.status = 'active' 
+                    AND c.expiry_date >= CURDATE()";
+$res_coupons = $conn->query($sql_get_coupons);
+
+if ($res_coupons->num_rows > 0) {
+    while($c = $res_coupons->fetch_assoc()) {
+        
+        // 预先计算这张券能省多少钱
+        $potential_save = 0;
+        if ($original_total >= $c['min_spend']) {
+            if ($c['discount_type'] == 'percent') {
+                $potential_save = $original_total * ($c['discount_value'] / 100);
+            } else {
+                $potential_save = $c['discount_value'];
+            }
+            if ($potential_save > $original_total) $potential_save = $original_total;
+        }
+
+        // 存入数组，把 calculated_save 也存进去
+        $c['calculated_save'] = $potential_save;
+        $my_coupons[] = $c;
+
+        // 比对找出最大值
+        if ($potential_save > $max_potential_discount) {
+            $max_potential_discount = $potential_save;
+            $best_coupon_code = $c['code'];
+        }
+    }
+}
+
+// --- 3. 处理应用逻辑 (用户点击 Apply 或 自动应用) ---
+// 只要有点 Apply 按钮，或者 URL 里带了 auto_best=1
+if (($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['apply_coupon'])) || (isset($_GET['auto_best']) && $_GET['auto_best'] == 1)) {
     
-    // 模拟：检查用户是否登录 (Module A完成前，我们暂时手动指定 user_id = 1 用于测试)
-    // 正式上线时请去掉 "|| 1"，只保留 $_SESSION['user_id']
-    $user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 1; 
+    // 如果是自动应用模式，直接取最优代码
+    if (isset($_GET['auto_best']) && $_GET['auto_best'] == 1 && !empty($best_coupon_code)) {
+        $code_input = $best_coupon_code;
+    } else {
+        $code_input = trim($_POST['coupon_code']);
+    }
 
-    // 获取支付信息 (仅做演示，不存储敏感卡号)
-    $card_holder = $conn->real_escape_string($_POST['card_holder']);
-    // $card_number = $_POST['card_number']; // 实际项目中不存卡号，仅做支付网关验证
+    if (!empty($code_input)) {
+        // 在内存数组里找这张券 (避免再次查库)
+        $found_coupon = null;
+        foreach ($my_coupons as $mc) {
+            if ($mc['code'] === $code_input) {
+                $found_coupon = $mc;
+                break;
+            }
+        }
 
-    // 状态默认为 'confirmed'，支付状态 'paid' (因为是模拟支付成功)
+        if ($found_coupon) {
+            if ($original_total >= $found_coupon['min_spend']) {
+                $applied_coupon_code = $found_coupon['code'];
+                $discount_amount = $found_coupon['calculated_save']; // 直接用刚才算好的
+                $final_total = $original_total - $discount_amount;
+                
+                // 提示语差异化
+                if (isset($_GET['auto_best'])) {
+                    $coupon_msg = "<div class='alert success mt-2'>⚡ Best deal applied automatically! Saved RM " . number_format($discount_amount, 2) . "</div>";
+                } else {
+                    $coupon_msg = "<div class='alert success mt-2'>Voucher applied successfully.</div>";
+                }
+            } else {
+                $coupon_msg = "<div class='alert error mt-2'>Min spend RM " . $found_coupon['min_spend'] . " required.</div>";
+            }
+        } else {
+            $coupon_msg = "<div class='alert error mt-2'>Invalid voucher code.</div>";
+        }
+    }
+}
+
+// --- 4. 最终支付处理 ---
+if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
+    $final_code = trim($_POST['applied_code_hidden']);
+    $final_pay_amount = $original_total;
+    $coupon_id_to_update = 0;
+
+    if (!empty($final_code)) {
+        // 最终校验一次数据库
+        $sql_c = "SELECT uc.uc_id, c.* FROM user_coupons uc JOIN coupons c ON uc.coupon_id = c.coupon_id 
+                  WHERE uc.user_id = '$user_id' AND c.code = '$final_code' AND uc.status = 'active'";
+        $res_c = $conn->query($sql_c);
+        
+        if ($res_c->num_rows > 0) {
+            $coupon = $res_c->fetch_assoc();
+            if ($original_total >= $coupon['min_spend']) {
+                $coupon_id_to_update = $coupon['uc_id'];
+                // 重新计算确保安全
+                $disc = ($coupon['discount_type'] == 'percent') ? $original_total * ($coupon['discount_value'] / 100) : $coupon['discount_value'];
+                if ($disc > $original_total) $disc = $original_total;
+                $final_pay_amount = $original_total - $disc;
+            }
+        }
+    }
+
     $sql_insert = "INSERT INTO bookings (user_id, room_id, check_in_date, check_out_date, total_price, booking_status, payment_status) 
-                   VALUES ('$user_id', '$room_id', '$check_in', '$check_out', '$total_price', 'confirmed', 'paid')";
+                   VALUES ('$user_id', '$room_id', '$check_in', '$check_out', '$final_pay_amount', 'confirmed', 'paid')";
 
     if ($conn->query($sql_insert) === TRUE) {
-        echo "<script>
-                alert('Payment Successful! Your booking is confirmed.'); 
-                window.location.href='../Module A/user_dashboard.php'; 
-              </script>";
+        if ($coupon_id_to_update > 0) {
+            $conn->query("UPDATE user_coupons SET status = 'used' WHERE uc_id = '$coupon_id_to_update'");
+        }
+        echo "<script>alert('Payment Successful!'); window.location.href='../Module A/user_dashboard.php';</script>";
         exit();
     } else {
         $msg = "<div class='alert error'>Error: " . $conn->error . "</div>";
@@ -74,72 +164,149 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta charset="UTF-8">
     <title>Checkout & Payment</title>
     <link rel="stylesheet" href="../css/style.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
-        .checkout-container { max-width: 800px; margin: 50px auto; padding: 20px; display: flex; gap: 30px; }
-        .order-summary, .payment-form { flex: 1; padding: 20px; border: 1px solid #ddd; border-radius: 8px; background: #fff; }
-        .order-summary h3 { border-bottom: 2px solid #333; padding-bottom: 10px; margin-top: 0; }
-        .total-price { font-size: 1.5em; color: #e74c3c; font-weight: bold; margin-top: 20px; }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        .btn-pay { background-color: #28a745; color: white; width: 100%; padding: 12px; border: none; font-size: 1.1em; cursor: pointer; border-radius: 4px; }
-        .btn-pay:hover { background-color: #218838; }
-        .alert { padding: 10px; margin-bottom: 15px; border-radius: 4px; }
+        body { background-color: #f8f9fa; }
+        .checkout-container { max-width: 900px; margin: 50px auto; display: flex; gap: 30px; }
+        .order-summary, .payment-form { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .order-summary { flex: 1; border-right: 5px solid #f0ad4e; }
+        .payment-form { flex: 1.5; }
+        .price-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
+        .total-row { font-size: 1.4em; font-weight: bold; color: #333; border-top: 2px solid #eee; padding-top: 15px; margin-top: 15px; }
+        .discount-text { color: #28a745; }
+        .alert { padding: 10px; border-radius: 5px; font-size: 0.9em; }
+        .success { background-color: #d4edda; color: #155724; }
         .error { background-color: #f8d7da; color: #721c24; }
         
-        /* 响应式：手机端上下排列 */
-        @media (max-width: 768px) { .checkout-container { flex-direction: column; } }
+        /* 闪电按钮动画 */
+        .btn-smart { animation: pulse 2s infinite; }
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
+        }
     </style>
 </head>
 <body>
 
-<nav style="background:#333; padding:15px; color:#fff;">
-    <div style="max-width:1200px; margin:0 auto;">
-        <span style="font-size:1.2em; font-weight:bold;">Homestay Payment</span>
-        <a href="../index.php" style="float:right; color:#fff; text-decoration:none;">Cancel & Exit</a>
+<nav class="navbar navbar-dark bg-dark py-3">
+    <div class="container">
+        <span class="navbar-brand mb-0 h1 fw-bold">Checkout</span>
+        <a href="../index.php" class="text-white text-decoration-none">Cancel</a>
     </div>
 </nav>
 
-<div class="checkout-container">
+<div class="container checkout-container">
     
     <div class="order-summary">
-        <h3>Order Summary</h3>
-        <p><strong>Room:</strong> <?php echo htmlspecialchars($room['room_name']); ?></p>
-        <p><strong>Check-in:</strong> <?php echo htmlspecialchars($check_in); ?></p>
-        <p><strong>Check-out:</strong> <?php echo htmlspecialchars($check_out); ?></p>
-        <p><strong>Duration:</strong> <?php echo $days; ?> Night(s)</p>
-        <p><strong>Price per night:</strong> RM <?php echo number_format($room['price_per_night'], 2); ?></p>
+        <h4 class="fw-bold mb-4">Summary</h4>
+        <div class="mb-3">
+            <small class="text-muted d-block">Room Type</small>
+            <strong><?php echo htmlspecialchars($room['room_name']); ?></strong>
+        </div>
+        <div class="mb-3">
+            <small class="text-muted d-block">Dates</small>
+            <span><?php echo $check_in; ?> <i class="bi bi-arrow-right"></i> <?php echo $check_out; ?></span>
+            <br><span class="badge bg-secondary"><?php echo $days; ?> Nights</span>
+        </div>
         <hr>
-        <div class="total-price">Total: RM <?php echo number_format($total_price, 2); ?></div>
+        <div class="price-row">
+            <span>Subtotal</span>
+            <span>RM <?php echo number_format($original_total, 2); ?></span>
+        </div>
+        <?php if ($discount_amount > 0): ?>
+        <div class="price-row discount-text">
+            <span>Voucher Applied</span>
+            <span>- RM <?php echo number_format($discount_amount, 2); ?></span>
+        </div>
+        <?php endif; ?>
+        <div class="price-row total-row">
+            <span>Total to Pay</span>
+            <span class="text-primary">RM <?php echo number_format($final_total, 2); ?></span>
+        </div>
     </div>
 
     <div class="payment-form">
-        <h3>Payment Details</h3>
-        <?php echo $msg; ?>
         
-        <form method="POST" onsubmit="return confirm('Confirm payment of RM <?php echo $total_price; ?>?');">
-            <div class="form-group">
-                <label>Cardholder Name</label>
-                <input type="text" name="card_holder" placeholder="e.g. John Doe" required>
+        <h5 class="fw-bold mb-3 d-flex justify-content-between align-items-center">
+            <span><i class="bi bi-ticket-perforated me-2"></i>My Vouchers</span>
+            
+            <?php if (!empty($best_coupon_code) && $applied_coupon_code !== $best_coupon_code && $max_potential_discount > 0): ?>
+                <a href="?room_id=<?php echo $room_id; ?>&check_in=<?php echo $check_in; ?>&check_out=<?php echo $check_out; ?>&auto_best=1" 
+                   class="btn btn-sm btn-warning fw-bold btn-smart shadow-sm">
+                   <i class="bi bi-lightning-charge-fill"></i> Auto-Apply Best (-RM<?php echo intval($max_potential_discount); ?>)
+                </a>
+            <?php endif; ?>
+        </h5>
+        
+        <form method="POST" action=""> 
+            <div class="input-group mb-3">
+                <select name="coupon_code" class="form-select" <?php echo ($discount_amount > 0) ? 'disabled' : ''; ?>>
+                    <option value="">-- Select a Voucher --</option>
+                    
+                    <?php if (!empty($my_coupons)): ?>
+                        <?php foreach($my_coupons as $c): ?>
+                            <?php 
+                                $desc = ($c['discount_type'] == 'percent') ? intval($c['discount_value'])."% OFF" : "RM ".intval($c['discount_value'])." OFF";
+                                $isSelected = ($applied_coupon_code === $c['code']) ? 'selected' : '';
+                                
+                                // 【智能标签】如果是最优券，显示 Best Deal 文本
+                                $bestLabel = ($c['code'] === $best_coupon_code) ? " 🔥 Best Deal!" : "";
+                            ?>
+                            <option value="<?php echo $c['code']; ?>" <?php echo $isSelected; ?>>
+                                <?php echo $c['code']; ?> - <?php echo $desc; ?><?php echo $bestLabel; ?>
+                            </option>
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <option value="" disabled>No vouchers available</option>
+                    <?php endif; ?>
+
+                </select>
+
+                <button class="btn btn-dark fw-bold" type="submit" name="apply_coupon" <?php echo ($discount_amount > 0) ? 'disabled' : ''; ?>>
+                    Apply
+                </button>
+                
+                <?php if ($discount_amount > 0): ?>
+                     <a href="?room_id=<?php echo $room_id; ?>&check_in=<?php echo $check_in; ?>&check_out=<?php echo $check_out; ?>" class="btn btn-outline-secondary">Remove</a>
+                <?php endif; ?>
             </div>
             
-            <div class="form-group">
-                <label>Card Number (Demo Only)</label>
-                <input type="text" name="card_number" placeholder="1234 5678 9876 5432" required maxlength="19">
+            <?php echo $coupon_msg; ?>
+        </form>
+
+        <hr class="my-4">
+
+        <h5 class="fw-bold mb-3">Payment Details</h5>
+        <?php if(isset($msg)) echo $msg; ?>
+        
+        <form method="POST" onsubmit="return confirm('Proceed payment of RM <?php echo number_format($final_total, 2); ?>?');">
+            <input type="hidden" name="applied_code_hidden" value="<?php echo htmlspecialchars($applied_coupon_code); ?>">
+            <input type="hidden" name="confirm_payment" value="1">
+
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Cardholder Name</label>
+                <input type="text" name="card_holder" class="form-control" placeholder="John Doe" required>
+            </div>
+            <div class="mb-3">
+                <label class="form-label small fw-bold">Card Number</label>
+                <input type="text" class="form-control" placeholder="0000 0000 0000 0000" maxlength="19" required>
+            </div>
+            <div class="row">
+                <div class="col-6 mb-3">
+                    <label class="form-label small fw-bold">Expiry</label>
+                    <input type="text" class="form-control" placeholder="MM/YY" required>
+                </div>
+                <div class="col-6 mb-3">
+                    <label class="form-label small fw-bold">CVV</label>
+                    <input type="text" class="form-control" placeholder="123" maxlength="3" required>
+                </div>
             </div>
 
-            <div style="display:flex; gap:10px;">
-                <div class="form-group" style="flex:1;">
-                    <label>Expiry</label>
-                    <input type="text" placeholder="MM/YY" required>
-                </div>
-                <div class="form-group" style="flex:1;">
-                    <label>CVV</label>
-                    <input type="text" placeholder="123" required maxlength="3">
-                </div>
-            </div>
-
-            <button type="submit" class="btn-pay">Pay & Confirm Booking</button>
+            <button type="submit" class="btn btn-success w-100 py-3 fw-bold mt-2 shadow-sm">
+                Pay RM <?php echo number_format($final_total, 2); ?>
+            </button>
         </form>
     </div>
 

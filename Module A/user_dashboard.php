@@ -133,6 +133,54 @@ include '../includes/header.php';
             </form>
         </div>
         
+        <div class="card p-4 shadow-sm border-0 mb-4 rounded-4">
+            <h5 class="mb-3 fw-bold"><i class="bi bi-ticket-perforated me-2"></i>My Vouchers</h5>
+            
+            <?php
+            // 查询当前用户拥有的优惠券 (只显示 Active 的，或者你可以改成显示全部)
+            $coupon_sql = "SELECT uc.*, c.code, c.discount_value, c.discount_type, c.min_spend, c.expiry_date 
+                           FROM user_coupons uc 
+                           JOIN coupons c ON uc.coupon_id = c.coupon_id 
+                           WHERE uc.user_id = '$user_id' AND uc.status = 'active' 
+                           AND c.expiry_date >= CURDATE()";
+            $coupon_res = $conn->query($coupon_sql);
+            ?>
+
+            <div class="row">
+                <?php if ($coupon_res && $coupon_res->num_rows > 0): ?>
+                    <?php while($voucher = $coupon_res->fetch_assoc()): ?>
+                        <div class="col-md-6 mb-3">
+                            <div class="card h-100 border-warning border-2" style="background-color: #fff9e6;">
+                                <div class="card-body d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h5 class="fw-bold text-dark mb-1"><?php echo $voucher['code']; ?></h5>
+                                        <p class="text-muted small mb-1">
+                                            <?php 
+                                            if($voucher['discount_type'] == 'percent') {
+                                                echo intval($voucher['discount_value']) . "% OFF";
+                                            } else {
+                                                echo "RM " . number_format($voucher['discount_value'], 0) . " OFF";
+                                            }
+                                            ?>
+                                            (Min spend: RM <?php echo $voucher['min_spend']; ?>)
+                                        </p>
+                                        <small class="text-danger">Expires: <?php echo $voucher['expiry_date']; ?></small>
+                                    </div>
+                                    <div class="text-end">
+                                        <span class="badge bg-warning text-dark">Active</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    <?php endwhile; ?>
+                <?php else: ?>
+                    <div class="col-12 text-muted">You have no active vouchers.</div>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+
+
         <div class="card p-4 shadow-sm border-0 rounded-4">
             <h5 class="mb-3 fw-bold">Booking History</h5>
             <?php
