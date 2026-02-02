@@ -120,7 +120,7 @@ $recent_orders = $conn->query($sql_recent);
                 </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link text-dark" href="../Module A/admin_manage_users.php">
+                <a class="nav-link text-dark" href="../Module A/admin_reset_user.php">
                   <i class="bi bi-people me-2"></i> Manage Users
                 </a>
               </li>

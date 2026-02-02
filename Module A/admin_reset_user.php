@@ -1,7 +1,7 @@
 <?php
 // for admin to reset user password
 session_start();
-require_once 'db_connection.php';
+require_once '../includes/db_connection.php';
 
 // 1. Safety check: must be Admin
 if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
