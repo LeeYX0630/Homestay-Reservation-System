@@ -1,7 +1,7 @@
 <?php
 /**
  * =========================================================
- * 1. 路径修复：加上 ../ 返回上一级
+ * 1. 包含连接
  * =========================================================
  */
 include '../includes/db_connection.php'; 
@@ -11,11 +11,10 @@ include '../includes/header.php';
 $search_query = "";
 $where_clause = "";
 
-// 搜索逻辑
+// 搜索逻辑 (搜民宿名字 或 描述)
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $search_query = $conn->real_escape_string($_GET['search']);
-    // 既搜名字，也搜描述
-    $where_clause = "WHERE rooms.room_name LIKE '%$search_query%' OR rooms.description LIKE '%$search_query%'";
+    $where_clause = "WHERE room_name LIKE '%$search_query%' OR description LIKE '%$search_query%'";
 }
 ?>
 
@@ -27,35 +26,21 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
     <title>Room Catalogue</title>
     <style>
         /* =========================================
-           CSS 样式 (Tung's Standard: No Shorthand)
+           CSS 样式
            ========================================= */
-
-        /* 全局 */
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
             background-color: #f4f6f9;
-            margin-top: 0px;
-            margin-bottom: 0px;
-            margin-left: 0px;
-            margin-right: 0px;
-            padding-top: 0px;
-            padding-bottom: 0px;
-            padding-left: 0px;
-            padding-right: 0px;
+            margin: 0; padding: 0;
             color: #333333;
         }
 
         .catalogue-container {
             max-width: 1200px;
-            margin-top: 40px;
-            margin-bottom: 40px;
-            margin-left: auto;
-            margin-right: auto;
-            padding-left: 20px;
-            padding-right: 20px;
+            margin: 40px auto;
+            padding: 0 20px;
         }
 
-        /* 标题 */
         .page-header {
             text-align: center;
             margin-bottom: 40px;
@@ -63,14 +48,12 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
         .page-header h2 { font-size: 32px; color: #333; margin-bottom: 10px; }
         .page-header p { color: #666; font-size: 16px; }
 
-        /* ★ 网格布局：横向 3 列 ★ */
         .room-grid {
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 30px;
         }
 
-        /* 卡片样式 */
         .room-card {
             background-color: #ffffff;
             border-radius: 8px;
@@ -79,16 +62,13 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             transition: transform 0.3s ease;
             display: flex;
             flex-direction: column;
-            border-width: 1px;
-            border-style: solid;
-            border-color: #e0e0e0;
+            border: 1px solid #e0e0e0;
         }
         .room-card:hover {
             transform: translateY(-5px);
             box-shadow: 0px 8px 25px rgba(0,0,0,0.1);
         }
 
-        /* 图片区域 */
         .card-image {
             width: 100%;
             height: 220px;
@@ -96,17 +76,15 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             overflow: hidden;
         }
         .card-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
+            width: 100%; height: 100%; object-fit: cover;
+            transition: transform 0.5s ease;
+        }
+        .room-card:hover .card-image img {
+            transform: scale(1.05);
         }
 
-        /* 内容区域 */
         .card-content {
-            padding-top: 20px;
-            padding-bottom: 20px;
-            padding-left: 20px;
-            padding-right: 20px;
+            padding: 20px;
             flex-grow: 1;
             display: flex;
             flex-direction: column;
@@ -118,10 +96,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             font-size: 12px;
             font-weight: bold;
             text-transform: uppercase;
-            padding-top: 4px;
-            padding-bottom: 4px;
-            padding-left: 8px;
-            padding-right: 8px;
+            padding: 4px 8px;
             border-radius: 4px;
             display: inline-block;
             margin-bottom: 10px;
@@ -133,8 +108,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             font-size: 20px;
             font-weight: bold;
             color: #333;
-            margin-top: 0px;
-            margin-bottom: 10px;
+            margin: 0 0 10px 0;
         }
 
         .room-price {
@@ -147,12 +121,12 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 
         .room-details {
             list-style: none;
-            padding-left: 0px;
+            padding: 0;
             margin-bottom: 20px;
             color: #666;
             font-size: 14px;
         }
-        .room-details li { margin-bottom: 5px; }
+        .room-details li { margin-bottom: 8px; line-height: 1.4; }
 
         .card-footer { margin-top: auto; }
         .btn-view {
@@ -161,11 +135,11 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
             background-color: #333;
             color: #fff;
             text-align: center;
-            padding-top: 12px;
-            padding-bottom: 12px;
+            padding: 12px 0;
             text-decoration: none;
             border-radius: 4px;
             font-weight: bold;
+            box-sizing: border-box; 
         }
         .btn-view:hover { background-color: #000; }
         
@@ -176,62 +150,78 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 
 <div class="catalogue-container">
     <div class="page-header">
-        <h2>Our Room Catalogue</h2>
-        <p>Find your perfect homestay from our selection.</p>
+        <h2>Our Homestays</h2>
+        <p>Choose from our variety of homestays.</p>
     </div>
 
     <div class="room-grid">
         <?php
         /**
          * =========================================================
-         * ★ 核心修改：完全按照你的 Database 截图来写 SQL ★
-         * 1. 主要数据来自 rooms 表 (rooms.*)
-         * 2. 只 JOIN categories 表拿一个 category_name (名字)
+         * ★ 修正逻辑：直接读取 rooms 表的所有数据 ★
+         * - 包含 room_image, description, facilities, min_price, max_price
          * =========================================================
          */
-        $sql = "SELECT rooms.*, categories.category_name 
+        $sql = "SELECT rooms.*, 
+                       (SELECT COUNT(*) FROM categories WHERE categories.room_id = rooms.room_id) as cat_count
                 FROM rooms 
-                LEFT JOIN categories ON rooms.category_id = categories.category_id 
                 $where_clause 
-                ORDER BY rooms.room_name ASC";
+                ORDER BY room_name ASC";
         
         $result = $conn->query($sql);
 
         if ($result && $result->num_rows > 0) {
             while($row = $result->fetch_assoc()) {
-                // ★ 1. 图片路径：直接读取 rooms 表的 room_image
-                // 注意：如果你的图片在 uploads 文件夹，这里需要 ../uploads/
-                $img_path = !empty($row['room_image']) ? "../uploads/" . $row['room_image'] : "../assets/images/placeholder.jpg";
                 
-                // ★ 2. 设施：直接读取 rooms 表的 facilities
-                $facilities = $row['facilities'] ? $row['facilities'] : "Standard Amenities";
-                if (strlen($facilities) > 50) { $facilities = substr($facilities, 0, 50) . "..."; }
+                // 1. 处理图片 (优先显示 rooms 表里的图片)
+                $img_name = $row['room_image'];
+                if (!empty($img_name)) {
+                    // 假设图片在 uploads 文件夹
+                    $img_src = "../uploads/" . $img_name;
+                } else {
+                    // 默认图
+                    $img_src = "../assets/images/placeholder.jpg"; 
+                }
                 
-                // ★ 3. 价格：直接读取 rooms 表的 price_per_night
-                $price = $row['price_per_night'];
+                // 2. 价格范围
+                $min = $row['min_price'];
+                $max = $row['max_price'];
+                $price_display = "";
+                
+                if ($min == 0 && $max == 0) {
+                    $price_display = "Check Details";
+                } elseif ($min == $max) {
+                    $price_display = "RM " . number_format($min, 2);
+                } else {
+                    $price_display = "RM " . number_format($min, 2) . " - " . number_format($max, 2);
+                }
 
-                // ★ 4. 分类名：如果没分类显示 "Homestay"
-                $catName = $row['category_name'] ? $row['category_name'] : "Homestay";
+                // 3. 描述和设施
+                $desc = !empty($row['description']) ? substr($row['description'], 0, 60) . '...' : 'Enjoy a comfortable stay.';
+                $facilities = !empty($row['facilities']) ? $row['facilities'] : 'Standard Amenities';
+
+                // 4. 房型数量
+                $count = $row['cat_count'];
                 ?>
                 
                 <div class="room-card">
                     <div class="card-image">
-                        <img src="<?php echo $img_path; ?>" alt="<?php echo $row['room_name']; ?>">
+                        <img src="<?php echo $img_src; ?>" alt="<?php echo $row['room_name']; ?>" onerror="this.src='../assets/images/placeholder.jpg'">
                     </div>
                     
                     <div class="card-content">
-                        <div class="category-badge"><?php echo $catName; ?></div>
+                        <div class="category-badge"><?php echo $count; ?> Room Types Available</div>
 
                         <h3 class="room-title"><?php echo $row['room_name']; ?></h3>
 
                         <div class="room-price">
-                            RM <?php echo number_format($price, 2); ?>
+                            <?php echo $price_display; ?>
                             <span>/ night</span>
                         </div>
 
                         <ul class="room-details">
-                            <li><strong>Description:</strong> <?php echo substr($row['description'], 0, 60) . '...'; ?></li>
-                            <li><strong>Facilities:</strong> <?php echo $facilities; ?></li>
+                            <li><strong>Description:</strong> <?php echo $desc; ?></li>
+                            <li><strong>Facilities:</strong> <?php echo substr($facilities, 0, 50) . '...'; ?></li>
                         </ul>
 
                         <div class="card-footer">
@@ -245,7 +235,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                 <?php
             }
         } else {
-            echo "<div class='no-results'>No rooms found in database.</div>";
+            echo "<div class='no-results'>No homestays found in the database.</div>";
         }
         ?>
     </div>
