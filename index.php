@@ -1,12 +1,8 @@
 <?php
-// 开启 Session，用于判断用户是否登录 (Module A 负责写入 Session，这里负责读取)
 session_start();
 
-// 1. 引入数据库连接 (根据文档开发规范 [cite: 346])
 require_once 'includes/db_connection.php';
 
-// 2. 获取 "推荐房源" (Must Have: 推荐展示 )
-// 这里我们简单地取数据库里的前 3 个房间作为推荐
 $sql = "SELECT * FROM rooms LIMIT 3";
 $result = $conn->query($sql);
 ?>
@@ -20,33 +16,78 @@ $result = $conn->query($sql);
     <link rel="stylesheet" href="css/style.css">
     
     <style>
-        /* Hero Banner 区域 */
-        .hero-section {
-            background-color: #333333;
-            color: #F5F5F5;
-            padding: 100px 20px;
-            text-align: center;
-        }
-        
-        .hero-section h1 {
-            color: #F5F5F5; /* 强制覆盖全局 h1 颜色 */
-            font-size: 3em;
-            margin-bottom: 20px;
-        }
+    .hero-section {
+        position: relative;
+        height: 80vh; /* 调整高度 */
+        min-height: 500px;
+        color: #F5F5F5;
+        overflow: hidden;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        text-align: center;
+    }
+    
+    /* 影片背景样式 */
+    .video-background {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        z-index: -2;
+        object-fit: cover;
+        opacity: 0;
+        transition: opacity 1.5s ease-in-out; /* 切换时的淡入淡出效果 */
+    }
 
-        .cta-button {
-            background-color: #f0ad4e; /* 醒目的按钮颜色，可根据需要调整 */
-            color: white;
-            padding: 15px 30px;
-            text-decoration: none;
-            font-size: 1.2em;
-            border-radius: 5px;
-            font-weight: bold;
-        }
+    .video-active {
+        opacity: 1;
+    }
 
-        .cta-button:hover {
-            background-color: #ec971f;
-        }
+    /* 遮罩层：让文字更清晰 */
+    .hero-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.4); /* 40% 黑色的遮罩 */
+        z-index: -1;
+    }
+    
+    .hero-section h1 {
+        position: relative;
+        color: #F5F5F5;
+        font-size: 3.5em;
+        margin-bottom: 20px;
+        text-shadow: 2px 2px 10px rgba(0,0,0,0.5);
+    }
+
+    .hero-section p {
+        position: relative;
+        font-size: 1.5em;
+        margin-bottom: 40px;
+        text-shadow: 1px 1px 5px rgba(0,0,0,0.5);
+    }
+
+    .cta-button {
+        position: relative;
+        background-color: #f0ad4e;
+        color: white;
+        padding: 15px 40px;
+        text-decoration: none;
+        font-size: 1.2em;
+        border-radius: 5px;
+        font-weight: bold;
+        transition: 0.3s;
+    }
+
+    .cta-button:hover {
+        background-color: #ec971f;
+        transform: scale(1.05);
+    }
 
         .featured-container {
             max-width: 1200px;
@@ -113,11 +154,60 @@ $is_home_root = true;
 include 'includes/header.php';
 ?>
 
-    <div class="hero-section">
-        <h1>Welcome to Your Perfect Getaway</h1>
-        <p style="font-size: 1.2em; margin-bottom: 40px;">Experience comfort and luxury at affordable prices.</p>
-        <a href="Module B/room_catalogue.php" class="cta-button">Book Now</a>
-    </div>
+<div class="hero-section">
+    <div class="hero-overlay"></div>
+
+    <video class="video-background video-active" id="video1" muted playsinline>
+        <source src="images/Homestay video1.mp4" type="video/mp4">
+    </video>
+    <video class="video-background" id="video2" muted playsinline>
+        <source src="images/Homestay video2.mp4" type="video/mp4">
+    </video>
+    <video class="video-background" id="video3" muted playsinline>
+        <source src="images/Homestay video3.mp4" type="video/mp4">
+    </video>
+
+    <h1>Welcome to Your Perfect Getaway</h1>
+    <p>Experience comfort and luxury at affordable prices.</p>
+    <a href="Module B/room_catalogue.php" class="cta-button">Book Now</a>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const videos = [
+            document.getElementById('video1'),
+            document.getElementById('video2'),
+            document.getElementById('video3')
+        ];
+        let currentVideoIndex = 0;
+
+        // 预加载所有视频，防止切换时黑屏
+        videos.forEach(v => v.load());
+
+        // 初始化播放第一个影片
+        videos[0].play();
+
+        function playNextVideo() {
+            let nextIndex = (currentVideoIndex + 1) % videos.length;
+            
+            // 准备播放下一个影片
+            videos[nextIndex].currentTime = 0;
+            videos[nextIndex].play();
+            
+            // 切换显示状态（淡入淡出）
+            videos[currentVideoIndex].classList.remove('video-active');
+            videos[nextIndex].classList.add('video-active');
+            
+            // 更新索引
+            currentVideoIndex = nextIndex;
+        }
+
+        // 为每个影片添加结束监听事件
+        videos.forEach((video) => {
+            video.addEventListener('ended', playNextVideo);
+        });
+    });
+</script>
 
 <div class="featured-container">
         <h2 class="section-title">Recommended Rooms</h2>
