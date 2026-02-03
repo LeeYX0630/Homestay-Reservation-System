@@ -40,23 +40,82 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_super'])) {
     }
 }
 
-// --- 3. 获取统计数据 (替换 HTML 中的假数据) ---
-// 总订单
 $res_count = $conn->query("SELECT COUNT(*) as total FROM bookings");
 $total_bookings = $res_count->fetch_assoc()['total'];
 
-// 总收入 (已确认订单)
 $res_revenue = $conn->query("SELECT SUM(total_price) as revenue FROM bookings WHERE booking_status = 'confirmed'");
 $total_revenue = $res_revenue->fetch_assoc()['revenue'] ?? 0;
 
-// 待入住 (未来订单)
 $today = date('Y-m-d');
 $res_upcoming = $conn->query("SELECT COUNT(*) as upcoming FROM bookings WHERE booking_status = 'confirmed' AND check_in_date >= '$today'");
 $upcoming_bookings = $res_upcoming->fetch_assoc()['upcoming'];
 
-// 获取最新的 5 条订单 (用于填充 Recent Orders 表格)
 $sql_recent = "SELECT b.*, r.room_name FROM bookings b JOIN rooms r ON b.room_id = r.room_id ORDER BY b.booking_id DESC LIMIT 5";
 $recent_orders = $conn->query($sql_recent);
+
+$days_data = [
+    'Monday' => 0, 'Tuesday' => 0, 'Wednesday' => 0, 
+    'Thursday' => 0, 'Friday' => 0, 'Saturday' => 0, 'Sunday' => 0
+];
+
+$sql_chart = "SELECT DAYNAME(check_in_date) as day_name, COUNT(*) as cnt 
+              FROM bookings 
+              WHERE booking_status = 'confirmed' 
+              GROUP BY day_name";
+$res_chart = $conn->query($sql_chart);
+
+// ... (保留之前的数据库查询代码) ...
+
+if ($res_chart) {
+    while ($row = $res_chart->fetch_assoc()) {
+        $day = trim($row['day_name']);
+        if (isset($days_data[$day])) {
+            $days_data[$day] = $row['cnt'];
+        }
+    }
+}
+
+$max_val = max(array_values($days_data)) + 2;
+
+$chartConfig = [
+    'type' => 'bar',
+    'data' => [
+        'labels' => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        'datasets' => [[
+            'label' => 'Bookings',
+            'data' => array_values($days_data),
+            'backgroundColor' => 'rgba(13, 110, 253, 0.6)',
+            'borderColor' => 'rgba(13, 110, 253, 1)',
+            'borderWidth' => 1,
+            'borderRadius' => 5
+        ]]
+    ],
+    'options' => [
+        'plugins' => [
+            'legend' => ['display' => false],
+            'datalabels' => [
+                'anchor' => 'end',
+                'align' => 'top',
+                'color' => '#666',
+                'font' => ['weight' => 'bold']
+            ]
+        ],
+        'scales' => [
+            'y' => [
+                'beginAtZero' => true,
+                'suggestedMax' => $max_val,
+                'grid' => ['color' => 'rgba(0,0,0,0.05)']
+            ],
+            'x' => [
+                'grid' => ['display' => false]
+            ]
+        ]
+    ]
+];
+
+$chartUrl = "https://quickchart.io/chart?c=" . urlencode(json_encode($chartConfig));
+?>
+
 ?>
 
 <!doctype html>
@@ -242,12 +301,22 @@ $recent_orders = $conn->query($sql_recent);
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-12">
                 <div class="card border-0 shadow-sm">
                     <div class="card-body">
-                        <h5 class="card-title">Weekly Traffic (Demo Chart)</h5>
-                        <img src="https://quickchart.io/chart?c={type:'line',data:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],datasets:[{label:'Visitors',data:[50,60,70,180,190,200,150],borderColor:'blue',fill:false}]},options:{legend:{display:false}}}" class="img-fluid" style="max-height: 250px; width: 100%; object-fit: contain;" alt="Chart">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title fw-bold text-secondary">
+                                <i class="bi bi-bar-chart-fill me-2"></i>Popular Check-in Days
+                            </h5>
+                            <span class="badge bg-light text-dark border">Real-time Data</span>
+                        </div>
+                        
+                        <img src="<?php echo $chartUrl; ?>" class="img-fluid rounded" style="max-height: 300px; width: 100%; object-fit: contain;" alt="Chart">
+                        
+                        <div class="text-center mt-3 text-muted small">
+                            Based on confirmed check-in dates.
+                        </div>
                     </div>
                 </div>
             </div>
