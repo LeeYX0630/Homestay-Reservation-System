@@ -225,7 +225,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                         </ul>
 
                         <div class="card-footer">
-                            <a href="booking_details.php?room_id=<?php echo $row['room_id']; ?>" class="btn-view">
+                            <a href="room_details.php?room_id=<?php echo $row['room_id']; ?>" class="btn-view">
                                 VIEW DETAILS
                             </a>
                         </div>
