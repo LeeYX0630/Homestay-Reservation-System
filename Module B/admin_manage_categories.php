@@ -2,16 +2,33 @@
 include '../includes/db_connection.php';
 include '../includes/header.php';
 
-$swalCode = ""; 
+$swalCode = ""; // 存 JS 弹窗代码
 
 // =======================================================
 //  1. 删除逻辑 (Delete)
 // =======================================================
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
-    $conn->query("DELETE FROM categories WHERE category_id='$id'");
     
-    // 这里不需要同步 Room 价格了，因为现在是以 Room 的设定为准
+    $get_rid = $conn->query("SELECT room_id FROM categories WHERE category_id='$id'");
+    
+    if ($get_rid->num_rows > 0) {
+        $rid_row = $get_rid->fetch_assoc();
+        $r_id = $rid_row['room_id'];
+
+        $conn->query("DELETE FROM categories WHERE category_id='$id'");
+        
+        // 同步更新 Room 价格
+        $sync_sql = "SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p FROM categories WHERE room_id='$r_id'";
+        $sync_res = $conn->query($sync_sql);
+        $sync_row = $sync_res->fetch_assoc();
+        
+        $new_min = $sync_row['min_p'] ?? 0;
+        $new_max = $sync_row['max_p'] ?? 0;
+
+        $conn->query("UPDATE rooms SET min_price='$new_min', max_price='$new_max' WHERE room_id='$r_id'");
+    }
+
     $swalCode = "Swal.fire({
         title: 'Deleted!',
         text: 'The category has been deleted.',
@@ -38,10 +55,8 @@ if (isset($_POST['save_data'])) {
     $pax = intval($_POST['max_pax']);
     $desc = $conn->real_escape_string($_POST['description']);
 
-    // 确定 target_room_id
     $target_room_id = $room_id_select;
     if (!empty($cat_id)) {
-        // Edit 模式下，强制读取数据库里的 room_id，防止篡改
         $current_cat_query = $conn->query("SELECT room_id FROM categories WHERE category_id='$cat_id'");
         if ($current_cat_query->num_rows > 0) {
             $current_row = $current_cat_query->fetch_assoc();
@@ -49,7 +64,7 @@ if (isset($_POST['save_data'])) {
         }
     }
 
-    // ★★★ 核心新增：获取该 Room 的价格限制 ★★★
+    // 获取 Room 价格限制
     $limit_sql = "SELECT min_price, max_price FROM rooms WHERE room_id='$target_room_id'";
     $limit_res = $conn->query($limit_sql);
     $limit_row = $limit_res->fetch_assoc();
@@ -57,29 +72,20 @@ if (isset($_POST['save_data'])) {
     $room_min = floatval($limit_row['min_price']);
     $room_max = floatval($limit_row['max_price']);
 
-    // --- 开始验证 ---
-    
-    // 1. 验证负数
+    // 验证逻辑
     if ($price < 0 || $pax < 0) {
         $swalCode = "Swal.fire({ title: 'Error', text: 'Price and Pax cannot be negative!', icon: 'error', confirmButtonColor: '#d33' });";
-    } 
-    // 2. 验证名字为空
-    elseif (empty($cat_name)) {
+    } elseif (empty($cat_name)) {
         $swalCode = "Swal.fire({ title: 'Error', text: 'Category name cannot be empty!', icon: 'error', confirmButtonColor: '#d33' });";
-    } 
-    // ★★★ 3. 验证价格是否超出 Room 范围 ★★★
-    elseif ($price < $room_min || $price > $room_max) {
-        // 动态生成错误信息，告诉用户具体的范围
+    } elseif ($price < $room_min || $price > $room_max) {
         $errorMsg = "Price (RM $price) must be between RM $room_min and RM $room_max (as set in Room Details).";
         $swalCode = "Swal.fire({ title: 'Invalid Price', text: '$errorMsg', icon: 'error', confirmButtonColor: '#d33' });";
-    }
-    else {
-        // --- 验证通过，执行保存 ---
+    } else {
         $operation_success = false;
         $successTitle = "";
 
         if (!empty($cat_id)) {
-            // Edit 查重
+            // Edit
             $check = $conn->query("SELECT category_id FROM categories WHERE room_id='$target_room_id' AND category_name='$cat_name' AND category_id != '$cat_id'");
             if ($check->num_rows > 0) {
                 $swalCode = "Swal.fire({ title: 'Duplicate Name', text: 'This name is already used in this Homestay.', icon: 'warning', confirmButtonColor: '#333' });";
@@ -97,7 +103,7 @@ if (isset($_POST['save_data'])) {
                 }
             }
         } else {
-            // Add 查重
+            // Add
             $check = $conn->query("SELECT category_id FROM categories WHERE room_id='$target_room_id' AND category_name='$cat_name'");
             if ($check->num_rows > 0) {
                 $swalCode = "Swal.fire({ title: 'Duplicate', text: 'This Homestay already has a category named $cat_name.', icon: 'warning', confirmButtonColor: '#333' });";
@@ -112,9 +118,7 @@ if (isset($_POST['save_data'])) {
             }
         }
 
-        // --- 成功弹窗 ---
         if ($operation_success) {
-            // 注意：这里删除了 update rooms set min/max 的代码，因为现在我们要遵守 Room 的设定，而不是改变它
             $swalCode = "Swal.fire({ 
                 title: '$successTitle', 
                 text: 'Data saved successfully.', 
@@ -128,7 +132,7 @@ if (isset($_POST['save_data'])) {
 }
 
 // =======================================================
-//  3. 筛选逻辑 (Filter)
+//  3. 筛选逻辑
 // =======================================================
 $where_clauses = [];
 if (isset($_GET['search']) && !empty($_GET['search'])) {
@@ -163,9 +167,18 @@ if (count($where_clauses) > 0) {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        /* CSS 保持不变 */
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
         .container { max-width: 1300px; margin: 40px auto; padding: 0 20px; }
+        
+        /* ★ Back Button Style (保持一致) ★ */
+        .btn-back { 
+            display: inline-flex; align-items: center; margin-bottom: 20px; margin-top: 10px;
+            color: #555; text-decoration: none; font-weight: bold; font-size: 14px; 
+            background-color: #e9ecef; padding: 8px 20px; border-radius: 4px; 
+            transition: all 0.3s ease;
+        }
+        .btn-back:hover { background-color: #dde2e6; color: #333; transform: translateX(-3px); }
+
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
         .filter-bar { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
         .filter-group { display: flex; flex-direction: column; }
@@ -284,6 +297,9 @@ if (count($where_clauses) > 0) {
 <body>
 
 <div class="container">
+    
+    <a href="admin_dashboard.php" class="btn-back">&larr; Back to Dashboard</a>
+
     <h2>Manage Homestays & Categories</h2>
 
     <form class="filter-bar" method="get">
