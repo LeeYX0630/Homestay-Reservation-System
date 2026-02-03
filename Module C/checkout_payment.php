@@ -1,5 +1,5 @@
 <?php
-// module_c/checkout_payment.php - 智能折扣推荐版
+// module_c/checkout_payment.php
 session_start();
 require_once '../includes/db_connection.php';
 
@@ -19,18 +19,21 @@ if (!isset($_SESSION['user_id'])) {
 }
 $user_id = $_SESSION['user_id'];
 
-// 获取房间
+// 获取房间信息
 $sql_room = "SELECT * FROM rooms WHERE room_id = $room_id";
 $result_room = $conn->query($sql_room);
 if ($result_room->num_rows == 0) die("Room not found.");
 $room = $result_room->fetch_assoc();
 
-// 计算总价
+// 计算天数
 $date1 = new DateTime($check_in);
 $date2 = new DateTime($check_out);
 $interval = $date1->diff($date2);
 $days = $interval->days == 0 ? 1 : $interval->days;
-$original_total = $room['price_per_night'] * $days;
+
+// 【关键修改】使用 rooms 表里的 price_per_night 字段
+$price_per_night = floatval($room['price_per_night']); 
+$original_total = $price_per_night * $days;
 
 // 初始化变量
 $discount_amount = 0;
@@ -38,8 +41,8 @@ $final_total = $original_total;
 $coupon_msg = "";
 $applied_coupon_code = ""; 
 
-// --- 2. 【智能核心】获取优惠券并计算“最优解” ---
-$my_coupons = []; // 存入数组方便多次使用
+// --- 2. 优惠券逻辑 ---
+$my_coupons = []; 
 $best_coupon_code = "";
 $max_potential_discount = 0;
 
@@ -53,8 +56,6 @@ $res_coupons = $conn->query($sql_get_coupons);
 
 if ($res_coupons->num_rows > 0) {
     while($c = $res_coupons->fetch_assoc()) {
-        
-        // 预先计算这张券能省多少钱
         $potential_save = 0;
         if ($original_total >= $c['min_spend']) {
             if ($c['discount_type'] == 'percent') {
@@ -64,12 +65,9 @@ if ($res_coupons->num_rows > 0) {
             }
             if ($potential_save > $original_total) $potential_save = $original_total;
         }
-
-        // 存入数组，把 calculated_save 也存进去
         $c['calculated_save'] = $potential_save;
         $my_coupons[] = $c;
 
-        // 比对找出最大值
         if ($potential_save > $max_potential_discount) {
             $max_potential_discount = $potential_save;
             $best_coupon_code = $c['code'];
@@ -77,11 +75,9 @@ if ($res_coupons->num_rows > 0) {
     }
 }
 
-// --- 3. 处理应用逻辑 (用户点击 Apply 或 自动应用) ---
-// 只要有点 Apply 按钮，或者 URL 里带了 auto_best=1
+// --- 3. 应用优惠券 ---
 if (($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['apply_coupon'])) || (isset($_GET['auto_best']) && $_GET['auto_best'] == 1)) {
     
-    // 如果是自动应用模式，直接取最优代码
     if (isset($_GET['auto_best']) && $_GET['auto_best'] == 1 && !empty($best_coupon_code)) {
         $code_input = $best_coupon_code;
     } else {
@@ -89,7 +85,6 @@ if (($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['apply_coupon'])) || (
     }
 
     if (!empty($code_input)) {
-        // 在内存数组里找这张券 (避免再次查库)
         $found_coupon = null;
         foreach ($my_coupons as $mc) {
             if ($mc['code'] === $code_input) {
@@ -101,10 +96,9 @@ if (($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['apply_coupon'])) || (
         if ($found_coupon) {
             if ($original_total >= $found_coupon['min_spend']) {
                 $applied_coupon_code = $found_coupon['code'];
-                $discount_amount = $found_coupon['calculated_save']; // 直接用刚才算好的
+                $discount_amount = $found_coupon['calculated_save']; 
                 $final_total = $original_total - $discount_amount;
                 
-                // 提示语差异化
                 if (isset($_GET['auto_best'])) {
                     $coupon_msg = "<div class='alert success mt-2'>⚡ Best deal applied automatically! Saved RM " . number_format($discount_amount, 2) . "</div>";
                 } else {
@@ -119,14 +113,13 @@ if (($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['apply_coupon'])) || (
     }
 }
 
-// --- 4. 最终支付处理 ---
+// --- 4. 确认支付 ---
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     $final_code = trim($_POST['applied_code_hidden']);
     $final_pay_amount = $original_total;
     $coupon_id_to_update = 0;
 
     if (!empty($final_code)) {
-        // 最终校验一次数据库
         $sql_c = "SELECT uc.uc_id, c.* FROM user_coupons uc JOIN coupons c ON uc.coupon_id = c.coupon_id 
                   WHERE uc.user_id = '$user_id' AND c.code = '$final_code' AND uc.status = 'active'";
         $res_c = $conn->query($sql_c);
@@ -135,7 +128,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
             $coupon = $res_c->fetch_assoc();
             if ($original_total >= $coupon['min_spend']) {
                 $coupon_id_to_update = $coupon['uc_id'];
-                // 重新计算确保安全
                 $disc = ($coupon['discount_type'] == 'percent') ? $original_total * ($coupon['discount_value'] / 100) : $coupon['discount_value'];
                 if ($disc > $original_total) $disc = $original_total;
                 $final_pay_amount = $original_total - $disc;
@@ -178,8 +170,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         .alert { padding: 10px; border-radius: 5px; font-size: 0.9em; }
         .success { background-color: #d4edda; color: #155724; }
         .error { background-color: #f8d7da; color: #721c24; }
-        
-        /* 闪电按钮动画 */
         .btn-smart { animation: pulse 2s infinite; }
         @keyframes pulse {
             0% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0.7); }
@@ -210,11 +200,23 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
             <span><?php echo $check_in; ?> <i class="bi bi-arrow-right"></i> <?php echo $check_out; ?></span>
             <br><span class="badge bg-secondary"><?php echo $days; ?> Nights</span>
         </div>
+        
         <hr>
-        <div class="price-row">
+
+        <div class="price-row text-muted" style="font-size: 0.9em;">
+            <span>Price per night</span>
+            <span>RM <?php echo number_format($price_per_night, 2); ?></span>
+        </div>
+        <div class="price-row text-muted" style="font-size: 0.9em;">
+            <span>Duration</span>
+            <span>x <?php echo $days; ?> nights</span>
+        </div>
+        
+        <div class="price-row mt-2 fw-bold">
             <span>Subtotal</span>
             <span>RM <?php echo number_format($original_total, 2); ?></span>
         </div>
+
         <?php if ($discount_amount > 0): ?>
         <div class="price-row discount-text">
             <span>Voucher Applied</span>
@@ -250,8 +252,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
                             <?php 
                                 $desc = ($c['discount_type'] == 'percent') ? intval($c['discount_value'])."% OFF" : "RM ".intval($c['discount_value'])." OFF";
                                 $isSelected = ($applied_coupon_code === $c['code']) ? 'selected' : '';
-                                
-                                // 【智能标签】如果是最优券，显示 Best Deal 文本
                                 $bestLabel = ($c['code'] === $best_coupon_code) ? " 🔥 Best Deal!" : "";
                             ?>
                             <option value="<?php echo $c['code']; ?>" <?php echo $isSelected; ?>>
