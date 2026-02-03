@@ -119,21 +119,40 @@ include 'includes/header.php';
         <a href="Module B/room_catalogue.php" class="cta-button">Book Now</a>
     </div>
 
-    <div class="featured-container">
+<div class="featured-container">
         <h2 class="section-title">Recommended Rooms</h2>
         
         <div class="room-grid">
             <?php
+            // 【修改】SQL 查询：确保读取 min_price 和 max_price
+            $sql = "SELECT * FROM rooms LIMIT 3";
+            $result = $conn->query($sql);
+
             if ($result->num_rows > 0) {
                 while($row = $result->fetch_assoc()) {
                     $img_path = !empty($row['room_image']) ? "uploads/" . $row['room_image'] : "images/placeholder.jpg";
                     
+                    // --- 【核心逻辑】处理价格显示 ---
+                    $min = $row['min_price'];
+                    $max = $row['max_price'];
+                    $price_display = "";
+                    
+                    if ($min == 0 && $max == 0) {
+                        $price_display = "Check Details";
+                    } elseif ($min == $max) {
+                        $price_display = "RM " . number_format($min, 2);
+                    } else {
+                        // 显示范围格式
+                        $price_display = "RM " . number_format($min, 2) . " - " . number_format($max, 2);
+                    }
+                    // ---------------------------------
+
                     echo '
                     <div class="room-card">
                         <img src="'.$img_path.'" alt="'.$row['room_name'].'" class="room-img">
                         <div class="room-info">
                             <h3>'.$row['room_name'].'</h3>
-                            <p class="price">RM '.$row['price_per_night'].' / night</p>
+                            <p class="price">'.$price_display.' <span style="font-size: 0.7em; color: #999;">/ night</span></p>
                             <p>'.substr($row['description'], 0, 100).'...</p>
                             <a href="Module C/check_availability.php?room_id='.$row['room_id'].'">View Details &rarr;</a>
                         </div>

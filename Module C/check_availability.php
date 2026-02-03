@@ -91,12 +91,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
             }
 
-            // 构建跳转 URL
             $next_url = "checkout_payment.php?room_id=$room_id&check_in=$check_in&check_out=$check_out&guests=$guests";
 
             if ($user_conflict) {
-                // 【情况 1】有冲突：弹出 JS 确认框
-                // 如果用户点确定，JS 控制跳转；如果点取消，这就什么都不做
                 echo "<script>
                     var userChoice = confirm('⚠️ Double Booking Warning:\\n\\n$conflict_msg\\n\\nAre you sure you want to book another room for the same dates?');
                     
@@ -105,7 +102,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                     }
                 </script>";
             } else {
-                // 【情况 2】无冲突：直接跳转
                 header("Location: $next_url");
                 exit();
             }
