@@ -10,11 +10,9 @@ $alertMessage = "";
 $where_clauses = [];
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $s = $conn->real_escape_string($_GET['search']);
-    // 现在主要搜 categories 表
     $where_clauses[] = "(rooms.room_name LIKE '%$s%' OR categories.category_name LIKE '%$s%')";
 }
 if (isset($_GET['filter_cat']) && !empty($_GET['filter_cat'])) {
-    // 这里的 filter_cat 实际上是筛选 category_name
     $f_cat = $conn->real_escape_string($_GET['filter_cat']);
     $where_clauses[] = "categories.category_name = '$f_cat'";
 }
@@ -33,31 +31,24 @@ if (count($where_clauses) > 0) {
 }
 
 // =======================================================
-//  2. 保存逻辑 (Save Data) - 数据主要进 Categories 表
+//  2. 保存逻辑 (Save Data)
 // =======================================================
 if (isset($_POST['save_data'])) {
-    // 隐藏的 Category ID (如果是 Edit)
     $cat_id = $_POST['cat_id_hidden'] ?? '';
-    
-    // 表单数据
-    $room_id_select = $_POST['homestay_select']; // 选中的 Room ID
-    $cat_name = $_POST['category_select'];       // 选中的 Category Name
+    $room_id_select = $_POST['homestay_select']; 
+    $cat_name = $_POST['category_select'];       
     $price = $_POST['price_per_night'];
     $pax = $_POST['max_pax'];
     $desc = $conn->real_escape_string($_POST['description']);
 
-    // 1. 处理 Homestay (Rooms 表)
-    // 如果还没这间民宿(虽然下拉菜单通常是有的)，或者需要更新价格范围
-    // 这里我们假设 Rooms 表已经预先填好了民宿名字，或者你之后通过另一个页面管理
-    // 但为了逻辑完整，我们需要计算 Min/Max Price 并更新 Rooms 表
-    
-    // 2. 处理 Category Name (可以是新输入的)
     if ($cat_name === 'other') {
         $cat_name = $conn->real_escape_string($_POST['category_new_input']);
     }
 
+    $operation_success = false;
+
     if (!empty($cat_id)) {
-        // --- UPDATE Existing Category ---
+        // UPDATE
         $sql = "UPDATE categories SET 
                 room_id='$room_id_select', 
                 category_name='$cat_name', 
@@ -67,11 +58,11 @@ if (isset($_POST['save_data'])) {
                 WHERE category_id='$cat_id'";
         
         if ($conn->query($sql) === TRUE) {
-            $alertMessage = "alert('Category updated successfully!'); window.location.href='admin_manage_categories.php';";
+            $alertMessage = "alert('Category updated successfully!');";
+            $operation_success = true;
         }
     } else {
-        // --- INSERT New Category ---
-        // 检查这个 Homestay 是否已经有了这个分类名
+        // INSERT
         $check = $conn->query("SELECT category_id FROM categories WHERE room_id='$room_id_select' AND category_name='$cat_name'");
         if ($check->num_rows > 0) {
             $alertMessage = "alert('Error: This Homestay already has a category named $cat_name.');";
@@ -80,41 +71,62 @@ if (isset($_POST['save_data'])) {
                     VALUES ('$room_id_select', '$cat_name', '$price', '$pax', '$desc')";
             
             if ($conn->query($sql) === TRUE) {
-                $alertMessage = "alert('New Category added to Homestay!'); window.location.href='admin_manage_categories.php';";
+                $alertMessage = "alert('New Category added to Homestay!');";
+                $operation_success = true;
             }
         }
     }
 
-    // ★ 自动更新 Rooms 表的 Min/Max Price ★
-    if ($conn->affected_rows > 0 || !empty($alertMessage)) {
-        // 找出该民宿下最贵和最便宜的价格
-        $price_res = $conn->query("SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p FROM categories WHERE room_id='$room_id_select'");
-        $p_row = $price_res->fetch_assoc();
-        $min = $p_row['min_p'] ?? 0;
-        $max = $p_row['max_p'] ?? 0;
-        $conn->query("UPDATE rooms SET min_price='$min', max_price='$max' WHERE room_id='$room_id_select'");
+    // ★ 关键修复：同步更新 Rooms 表的价格范围 (Sync Logic) ★
+    if ($operation_success) {
+        // 1. 计算该民宿下所有分类的最低和最高价
+        $sync_sql = "SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p 
+                     FROM categories WHERE room_id='$room_id_select'";
+        $sync_res = $conn->query($sync_sql);
+        $sync_row = $sync_res->fetch_assoc();
+        
+        $new_min = $sync_row['min_p'] ?? 0;
+        $new_max = $sync_row['max_p'] ?? 0;
+
+        // 2. 更新 rooms 表
+        $update_room_sql = "UPDATE rooms SET min_price='$new_min', max_price='$new_max' WHERE room_id='$room_id_select'";
+        $conn->query($update_room_sql);
+        
+        // 3. 刷新页面以显示更改
+        echo "<script>$alertMessage window.location.href='admin_manage_categories.php';</script>";
+        exit();
     }
 }
 
-// Delete
+// =======================================================
+//  3. 删除逻辑 (Delete)
+// =======================================================
 if (isset($_GET['delete'])) {
     $id = $_GET['delete'];
-    // 先获取 room_id 以便更新价格
-    $get_rid = $conn->query("SELECT room_id FROM categories WHERE category_id='$id'");
-    $rid_row = $get_rid->fetch_assoc();
-    $r_id = $rid_row['room_id'];
-
-    // 删除
-    $conn->query("DELETE FROM categories WHERE category_id='$id'");
     
-    // 更新 Rooms 价格
-    $price_res = $conn->query("SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p FROM categories WHERE room_id='$r_id'");
-    $p_row = $price_res->fetch_assoc();
-    $min = $p_row['min_p'] ?? 0;
-    $max = $p_row['max_p'] ?? 0;
-    $conn->query("UPDATE rooms SET min_price='$min', max_price='$max' WHERE room_id='$r_id'");
+    // 获取 room_id 以便更新价格
+    $get_rid = $conn->query("SELECT room_id FROM categories WHERE category_id='$id'");
+    if ($get_rid->num_rows > 0) {
+        $rid_row = $get_rid->fetch_assoc();
+        $r_id = $rid_row['room_id'];
+
+        // 删除
+        $conn->query("DELETE FROM categories WHERE category_id='$id'");
+        
+        // ★ 同步更新 Rooms 表 ★
+        $sync_sql = "SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p 
+                     FROM categories WHERE room_id='$r_id'";
+        $sync_res = $conn->query($sync_sql);
+        $sync_row = $sync_res->fetch_assoc();
+        
+        $new_min = $sync_row['min_p'] ?? 0;
+        $new_max = $sync_row['max_p'] ?? 0;
+
+        $conn->query("UPDATE rooms SET min_price='$new_min', max_price='$new_max' WHERE room_id='$r_id'");
+    }
 
     echo "<script>alert('Category Deleted.'); window.location.href='admin_manage_categories.php';</script>";
+    exit();
 }
 ?>
 
@@ -124,14 +136,10 @@ if (isset($_GET['delete'])) {
     <meta charset="UTF-8">
     <title>Manage Homestays</title>
     <style>
-        /* =========================================
-           UI Styles (保留你满意的样式)
-           ========================================= */
+        /* ... (请保留你原来文件里的 CSS 代码) ... */
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
         .container { max-width: 1300px; margin: 40px auto; padding: 0 20px; }
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
-
-        /* Filter Bar */
         .filter-bar { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
         .filter-group { display: flex; flex-direction: column; }
         .filter-group label { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555; white-space: nowrap; line-height: 1.2; }
@@ -139,8 +147,6 @@ if (isset($_GET['delete'])) {
         .filter-actions { display: flex; gap: 10px; }
         .btn-filter { height: 38px; padding: 0 20px; background-color: #28a745 !important; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; box-sizing: border-box; }
         .btn-clear { height: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0 20px; background-color: #dc3545 !important; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px; box-sizing: border-box; border: none; }
-
-        /* Action Bar */
         .action-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .list-title { font-size: 20px; font-weight: bold; color: #333; margin: 0; }
         .search-add-group { display: flex; align-items: center; gap: 15px; height: 40px; }
@@ -148,8 +154,6 @@ if (isset($_GET['delete'])) {
         .search-form input { height: 40px; padding: 0 12px; border: 1px solid #ccc; border-right: none; border-radius: 4px 0 0 4px; width: 250px; outline: none; box-sizing: border-box; margin:0; }
         .search-form button { height: 40px; padding: 0 20px; background: #333; color: #fff; border: 1px solid #333; border-radius: 0 4px 4px 0; cursor: pointer; font-weight: bold; box-sizing: border-box; margin:0; line-height: normal; }
         .btn-add-new { height: 40px; background: #28a745; color: white; padding: 0 20px; border-radius: 4px; font-weight: bold; border: 1px solid #28a745; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; white-space: nowrap; box-sizing: border-box; margin:0; text-decoration: none; font-size: 14px; }
-
-        /* Table */
         table { width: 100%; border-collapse: collapse; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,0.05); border-radius: 8px; overflow: hidden; }
         table th { background: #343a40; color: white; padding: 12px; text-align: left; }
         table td { padding: 12px; border-bottom: 1px solid #eee; vertical-align: middle; color: #333; font-size: 14px; }
@@ -157,8 +161,6 @@ if (isset($_GET['delete'])) {
         .btn-edit, .btn-del { display: inline-flex; align-items: center; justify-content: center; width: 60px; height: 30px; border-radius: 3px; font-size: 12px; font-weight: bold; cursor: pointer; text-decoration: none; border: none; color: white; margin-right: 5px; }
         .btn-edit { background: #28a745 !important; } 
         .btn-del { background: #dc3545 !important; }
-
-        /* Modal Styles */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; }
         .modal-content { background: #fff; padding: 25px; width: 500px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: slideDown 0.3s ease-out; }
         @keyframes slideDown { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -192,17 +194,14 @@ if (isset($_GET['delete'])) {
             var title = document.getElementById('modalTitle');
             var roomSelect = document.getElementById('homestaySelect');
             
-            // 填充表单
             document.getElementById('catId').value = data.cat_id || '';
             document.getElementById('roomPrice').value = data.price || '';
             document.getElementById('catDesc').value = data.desc || ''; 
             document.getElementById('catPax').value = data.pax || ''; 
             
-            // Category 选择逻辑
             var catSelect = document.getElementById('catSelect');
             var found = false;
             if (data.cat_name) {
-                // 尝试在下拉菜单中找到对应的 Option
                 for (var i = 0; i < catSelect.options.length; i++) {
                     if (catSelect.options[i].text === data.cat_name) {
                         catSelect.selectedIndex = i;
@@ -210,22 +209,17 @@ if (isset($_GET['delete'])) {
                         break;
                     }
                 }
-                // 如果是新名字或者 "Other"，可能需要特殊处理，这里简化为默认
                 if(!found) catSelect.value = ''; 
             } else {
                 catSelect.value = '';
             }
             document.getElementById('newCategoryDiv').style.display = 'none';
 
-            // Homestay 选择逻辑
             roomSelect.value = data.room_id || '';
 
             if (mode === 'edit') {
                 title.innerText = 'Edit Category Detail';
-                // 编辑时锁定 Homestay 不让改，因为这是分类的属性
                 roomSelect.disabled = true; 
-                // 为了提交时能拿到值，需要一个 hidden input (或者 JS 在 submit 前 enable)
-                // 这里简单起见，我们加个 hidden input 存 room_id
                 document.getElementById('homestayIdHidden').value = data.room_id;
             } else {
                 title.innerText = 'Add New Category'; 
@@ -243,7 +237,6 @@ if (isset($_GET['delete'])) {
             if (event.target == document.getElementById('categoryModal')) closeModal();
         }
     </script>
-    <?php if(!empty($alertMessage)) { echo "<script>$alertMessage</script>"; } ?>
 </head>
 <body>
 
@@ -256,7 +249,6 @@ if (isset($_GET['delete'])) {
             <select name="filter_cat">
                 <option value="">All Categories</option>
                 <?php
-                // 这里的 categories 表现在只存名字可能重复，所以用 DISTINCT
                 $cats = $conn->query("SELECT DISTINCT category_name FROM categories ORDER BY category_name ASC");
                 while($c = $cats->fetch_assoc()) echo "<option value='".$c['category_name']."'>".$c['category_name']."</option>";
                 ?>
@@ -304,7 +296,6 @@ if (isset($_GET['delete'])) {
         </thead>
         <tbody>
             <?php
-            // ★ 核心查询：以 categories 表为主，JOIN rooms 表获取名字
             $sql = "SELECT categories.*, rooms.room_name 
                     FROM categories 
                     JOIN rooms ON categories.room_id = rooms.room_id 
@@ -327,7 +318,6 @@ if (isset($_GET['delete'])) {
                     foreach ($rows as $row) {
                         echo "<tr>";
                         if ($isFirst) {
-                            // Rowspan 显示 Homestay 名字
                             echo "<td rowspan='$count' class='homestay-name-cell'>" . $row['room_name'] . "</td>";
                             $isFirst = false;
                         }
@@ -339,7 +329,7 @@ if (isset($_GET['delete'])) {
                         
                         $descSafe = htmlspecialchars($row['description'], ENT_QUOTES);
                         $jsData = json_encode([
-                            'cat_id'=>$row['category_id'], // 这里是 Category 的 ID
+                            'cat_id'=>$row['category_id'],
                             'room_id'=>$row['room_id'], 
                             'room_name'=>$row['room_name'],
                             'cat_name'=>$row['category_name'],

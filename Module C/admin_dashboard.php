@@ -58,29 +58,35 @@ $days_data = [
     'Thursday' => 0, 'Friday' => 0, 'Saturday' => 0, 'Sunday' => 0
 ];
 
+$days_data = [
+    'Monday' => 0, 'Tuesday' => 0, 'Wednesday' => 0, 
+    'Thursday' => 0, 'Friday' => 0, 'Saturday' => 0, 'Sunday' => 0
+];
+
+// 统计订单
 $sql_chart = "SELECT DAYNAME(check_in_date) as day_name, COUNT(*) as cnt 
               FROM bookings 
-              WHERE booking_status = 'confirmed' 
+              WHERE booking_status = 'confirmed'
               GROUP BY day_name";
 $res_chart = $conn->query($sql_chart);
-
-// ... (保留之前的数据库查询代码) ...
 
 if ($res_chart) {
     while ($row = $res_chart->fetch_assoc()) {
         $day = trim($row['day_name']);
         if (isset($days_data[$day])) {
-            $days_data[$day] = $row['cnt'];
+            $days_data[$day] = (int)$row['cnt']; // 强制转为数字
         }
     }
 }
 
-$max_val = max(array_values($days_data)) + 2;
+// 找出最大值用于Y轴
+$max_val = max(array_values($days_data)) + 1;
 
+// 构建 JSON 配置
 $chartConfig = [
     'type' => 'bar',
     'data' => [
-        'labels' => ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+        'labels' => array_keys($days_data),
         'datasets' => [[
             'label' => 'Bookings',
             'data' => array_values($days_data),
@@ -113,10 +119,10 @@ $chartConfig = [
     ]
 ];
 
-$chartUrl = "https://quickchart.io/chart?c=" . urlencode(json_encode($chartConfig));
+// 使用 rawurlencode 防止 URL 里的特殊字符报错
+$chartUrl = "https://quickchart.io/chart?c=" . rawurlencode(json_encode($chartConfig));
 ?>
 
-?>
 
 <!doctype html>
 <html lang="en">
