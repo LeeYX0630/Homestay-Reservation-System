@@ -2,10 +2,137 @@
 include '../includes/db_connection.php';
 include '../includes/header.php';
 
-$alertMessage = "";
+$swalCode = ""; // 存 JS 弹窗代码
 
 // =======================================================
-//  1. 筛选逻辑 (Filter)
+//  1. 删除逻辑 (Delete)
+// =======================================================
+if (isset($_GET['delete'])) {
+    $id = intval($_GET['delete']);
+    
+    $get_rid = $conn->query("SELECT room_id FROM categories WHERE category_id='$id'");
+    
+    if ($get_rid->num_rows > 0) {
+        $rid_row = $get_rid->fetch_assoc();
+        $r_id = $rid_row['room_id'];
+
+        $conn->query("DELETE FROM categories WHERE category_id='$id'");
+        
+        // 同步更新 Room 价格
+        $sync_sql = "SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p FROM categories WHERE room_id='$r_id'";
+        $sync_res = $conn->query($sync_sql);
+        $sync_row = $sync_res->fetch_assoc();
+        
+        $new_min = $sync_row['min_p'] ?? 0;
+        $new_max = $sync_row['max_p'] ?? 0;
+
+        $conn->query("UPDATE rooms SET min_price='$new_min', max_price='$new_max' WHERE room_id='$r_id'");
+    }
+
+    $swalCode = "Swal.fire({
+        title: 'Deleted!',
+        text: 'The category has been deleted.',
+        icon: 'success',
+        confirmButtonColor: '#28a745'
+    }).then(() => {
+        window.location.href = 'admin_manage_categories.php';
+    });";
+}
+
+// =======================================================
+//  2. 保存逻辑 (Save Data)
+// =======================================================
+if (isset($_POST['save_data'])) {
+    $cat_id = $_POST['cat_id_hidden'] ?? '';
+    $room_id_select = $_POST['homestay_select']; 
+    
+    $cat_name = $_POST['category_select'];
+    if ($cat_name === 'other') {
+        $cat_name = trim($conn->real_escape_string($_POST['category_new_input']));
+    }
+
+    $price = floatval($_POST['price_per_night']);
+    $pax = intval($_POST['max_pax']);
+    $desc = $conn->real_escape_string($_POST['description']);
+
+    $target_room_id = $room_id_select;
+    if (!empty($cat_id)) {
+        $current_cat_query = $conn->query("SELECT room_id FROM categories WHERE category_id='$cat_id'");
+        if ($current_cat_query->num_rows > 0) {
+            $current_row = $current_cat_query->fetch_assoc();
+            $target_room_id = $current_row['room_id'];
+        }
+    }
+
+    // 获取 Room 价格限制
+    $limit_sql = "SELECT min_price, max_price FROM rooms WHERE room_id='$target_room_id'";
+    $limit_res = $conn->query($limit_sql);
+    $limit_row = $limit_res->fetch_assoc();
+    
+    $room_min = floatval($limit_row['min_price']);
+    $room_max = floatval($limit_row['max_price']);
+
+    // 验证逻辑
+    if ($price < 0 || $pax < 0) {
+        $swalCode = "Swal.fire({ title: 'Error', text: 'Price and Pax cannot be negative!', icon: 'error', confirmButtonColor: '#d33' });";
+    } elseif (empty($cat_name)) {
+        $swalCode = "Swal.fire({ title: 'Error', text: 'Category name cannot be empty!', icon: 'error', confirmButtonColor: '#d33' });";
+    } elseif ($price < $room_min || $price > $room_max) {
+        $errorMsg = "Price (RM $price) must be between RM $room_min and RM $room_max (as set in Room Details).";
+        $swalCode = "Swal.fire({ title: 'Invalid Price', text: '$errorMsg', icon: 'error', confirmButtonColor: '#d33' });";
+    } else {
+        $operation_success = false;
+        $successTitle = "";
+
+        if (!empty($cat_id)) {
+            // Edit
+            $check = $conn->query("SELECT category_id FROM categories WHERE room_id='$target_room_id' AND category_name='$cat_name' AND category_id != '$cat_id'");
+            if ($check->num_rows > 0) {
+                $swalCode = "Swal.fire({ title: 'Duplicate Name', text: 'This name is already used in this Homestay.', icon: 'warning', confirmButtonColor: '#333' });";
+            } else {
+                $sql = "UPDATE categories SET 
+                        category_name='$cat_name', 
+                        price_per_night='$price', 
+                        max_pax='$pax', 
+                        description='$desc' 
+                        WHERE category_id='$cat_id'";
+                
+                if ($conn->query($sql) === TRUE) {
+                    $operation_success = true;
+                    $successTitle = "Edit Complete";
+                }
+            }
+        } else {
+            // Add
+            $check = $conn->query("SELECT category_id FROM categories WHERE room_id='$target_room_id' AND category_name='$cat_name'");
+            if ($check->num_rows > 0) {
+                $swalCode = "Swal.fire({ title: 'Duplicate', text: 'This Homestay already has a category named $cat_name.', icon: 'warning', confirmButtonColor: '#333' });";
+            } else {
+                $sql = "INSERT INTO categories (room_id, category_name, price_per_night, max_pax, description) 
+                        VALUES ('$target_room_id', '$cat_name', '$price', '$pax', '$desc')";
+                
+                if ($conn->query($sql) === TRUE) {
+                    $operation_success = true;
+                    $successTitle = "Add Complete";
+                }
+            }
+        }
+
+        if ($operation_success) {
+            $swalCode = "Swal.fire({ 
+                title: '$successTitle', 
+                text: 'Data saved successfully.', 
+                icon: 'success', 
+                confirmButtonColor: '#28a745' 
+            }).then(() => {
+                window.location.href = 'admin_manage_categories.php';
+            });";
+        }
+    }
+}
+
+// =======================================================
+//  3. 筛选逻辑
 // =======================================================
 $where_clauses = [];
 if (isset($_GET['search']) && !empty($_GET['search'])) {
@@ -29,109 +156,6 @@ $where_sql = "";
 if (count($where_clauses) > 0) {
     $where_sql = "WHERE " . implode(" AND ", $where_clauses);
 }
-
-// =======================================================
-//  2. 保存逻辑 (Save Data)
-// =======================================================
-if (isset($_POST['save_data'])) {
-    $cat_id = $_POST['cat_id_hidden'] ?? '';
-    $room_id_select = $_POST['homestay_select']; 
-    $cat_name = $_POST['category_select'];       
-    
-    // 【修复 1】强制转换为数字类型
-    $price = floatval($_POST['price_per_night']);
-    $pax = intval($_POST['max_pax']);
-    
-    $desc = $conn->real_escape_string($_POST['description']);
-
-    if ($cat_name === 'other') {
-        $cat_name = $conn->real_escape_string($_POST['category_new_input']);
-    }
-
-    // 【修复 2】后端验证：如果发现负数，直接拦截
-    if ($price < 0 || $pax < 0) {
-        echo "<script>alert('Error: Price and Pax cannot be negative numbers!'); window.location.href='admin_manage_categories.php';</script>";
-        exit();
-    }
-
-    $operation_success = false;
-
-    if (!empty($cat_id)) {
-        // UPDATE
-        $sql = "UPDATE categories SET 
-                room_id='$room_id_select', 
-                category_name='$cat_name', 
-                price_per_night='$price', 
-                max_pax='$pax', 
-                description='$desc' 
-                WHERE category_id='$cat_id'";
-        
-        if ($conn->query($sql) === TRUE) {
-            $alertMessage = "alert('Category updated successfully!');";
-            $operation_success = true;
-        }
-    } else {
-        // INSERT
-        $check = $conn->query("SELECT category_id FROM categories WHERE room_id='$room_id_select' AND category_name='$cat_name'");
-        if ($check->num_rows > 0) {
-            $alertMessage = "alert('Error: This Homestay already has a category named $cat_name.');";
-        } else {
-            $sql = "INSERT INTO categories (room_id, category_name, price_per_night, max_pax, description) 
-                    VALUES ('$room_id_select', '$cat_name', '$price', '$pax', '$desc')";
-            
-            if ($conn->query($sql) === TRUE) {
-                $alertMessage = "alert('New Category added to Homestay!');";
-                $operation_success = true;
-            }
-        }
-    }
-
-    // 同步更新 Rooms 表的价格范围
-    if ($operation_success) {
-        $sync_sql = "SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p 
-                     FROM categories WHERE room_id='$room_id_select'";
-        $sync_res = $conn->query($sync_sql);
-        $sync_row = $sync_res->fetch_assoc();
-        
-        $new_min = $sync_row['min_p'] ?? 0;
-        $new_max = $sync_row['max_p'] ?? 0;
-
-        $update_room_sql = "UPDATE rooms SET min_price='$new_min', max_price='$new_max' WHERE room_id='$room_id_select'";
-        $conn->query($update_room_sql);
-        
-        echo "<script>$alertMessage window.location.href='admin_manage_categories.php';</script>";
-        exit();
-    }
-}
-
-// =======================================================
-//  3. 删除逻辑 (Delete)
-// =======================================================
-if (isset($_GET['delete'])) {
-    $id = $_GET['delete'];
-    
-    $get_rid = $conn->query("SELECT room_id FROM categories WHERE category_id='$id'");
-    if ($get_rid->num_rows > 0) {
-        $rid_row = $get_rid->fetch_assoc();
-        $r_id = $rid_row['room_id'];
-
-        $conn->query("DELETE FROM categories WHERE category_id='$id'");
-        
-        // 同步更新
-        $sync_sql = "SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p 
-                     FROM categories WHERE room_id='$r_id'";
-        $sync_res = $conn->query($sync_sql);
-        $sync_row = $sync_res->fetch_assoc();
-        
-        $new_min = $sync_row['min_p'] ?? 0;
-        $new_max = $sync_row['max_p'] ?? 0;
-
-        $conn->query("UPDATE rooms SET min_price='$new_min', max_price='$new_max' WHERE room_id='$r_id'");
-    }
-
-    echo "<script>alert('Category Deleted.'); window.location.href='admin_manage_categories.php';</script>";
-    exit();
-}
 ?>
 
 <!DOCTYPE html>
@@ -139,9 +163,22 @@ if (isset($_GET['delete'])) {
 <head>
     <meta charset="UTF-8">
     <title>Manage Homestays</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
         .container { max-width: 1300px; margin: 40px auto; padding: 0 20px; }
+        
+        /* ★ Back Button Style (保持一致) ★ */
+        .btn-back { 
+            display: inline-flex; align-items: center; margin-bottom: 20px; margin-top: 10px;
+            color: #555; text-decoration: none; font-weight: bold; font-size: 14px; 
+            background-color: #e9ecef; padding: 8px 20px; border-radius: 4px; 
+            transition: all 0.3s ease;
+        }
+        .btn-back:hover { background-color: #dde2e6; color: #333; transform: translateX(-3px); }
+
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
         .filter-bar { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
         .filter-group { display: flex; flex-direction: column; }
@@ -191,6 +228,22 @@ if (isset($_GET['delete'])) {
                 inputDiv.style.display = 'none';
                 inputField.required = false;
             }
+        }
+
+        function confirmDelete(catId) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545', 
+                cancelButtonColor: '#333',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    window.location.href = 'admin_manage_categories.php?delete=' + catId;
+                }
+            })
         }
 
         function openModal(mode, data = {}) {
@@ -244,6 +297,9 @@ if (isset($_GET['delete'])) {
 <body>
 
 <div class="container">
+    
+    <a href="admin_dashboard.php" class="btn-back">&larr; Back to Dashboard</a>
+
     <h2>Manage Homestays & Categories</h2>
 
     <form class="filter-bar" method="get">
@@ -307,7 +363,7 @@ if (isset($_GET['delete'])) {
             
             $result = $conn->query($sql);
             $groupedData = [];
-            if ($result->num_rows > 0) {
+            if ($result && $result->num_rows > 0) {
                 while($row = $result->fetch_assoc()) {
                     $groupedData[$row['room_name']][] = $row;
                 }
@@ -342,7 +398,7 @@ if (isset($_GET['delete'])) {
                         ]);
                         
                         echo "<button class='btn-edit' onclick='openModal(\"edit\", $jsData)'>EDIT</button>";
-                        echo "<a href='admin_manage_categories.php?delete=" . $row['category_id'] . "' class='btn-del' onclick='return confirm(\"Delete this category?\")'>DEL</a>";
+                        echo "<button class='btn-del' onclick='confirmDelete(" . $row['category_id'] . ")'>DEL</button>";
                         echo "</td>";
                         echo "</tr>";
                     }
@@ -415,6 +471,8 @@ if (isset($_GET['delete'])) {
         </form>
     </div>
 </div>
+
+<?php if (!empty($swalCode)) { echo "<script>$swalCode</script>"; } ?>
 
 <?php include '../includes/footer.php'; ?>
 
