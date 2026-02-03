@@ -137,6 +137,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .error { background-color: #f8d7da; color: #721c24; }
         input[readonly] { background-color: #e9ecef; cursor: not-allowed; border: 1px solid #ced4da; }
         input[type=number] { border: 1px solid #ced4da; }
+
+        .progressbar { counter-reset: step; padding: 0; display: flex; justify-content: space-between; list-style: none; position: relative; }
+        .progressbar li { width: 33.33%; position: relative; text-align: center; font-size: 13px; color: #ccc; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .progressbar li:before { content: counter(step); counter-increment: step; width: 30px; height: 30px; line-height: 28px; border: 2px solid #e0e0e0; background: #fff; display: block; text-align: center; margin: 0 auto 10px auto; border-radius: 50%; color: #ccc; font-weight: bold; z-index: 2; position: relative; }
+        .progressbar li:after { content: ''; position: absolute; width: 100%; height: 3px; background: #e0e0e0; top: 15px; left: -50%; z-index: 0; }
+        .progressbar li:first-child:after { content: none; }
+        
+        /* Active State (当前步骤) */
+        .progressbar li.active { color: #333; }
+        .progressbar li.active:before { border-color: #28a745; background: #fff; color: #28a745; box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1); }
+        
+        /* Completed State (已完成) */
+        .progressbar li.completed { color: #28a745; }
+        .progressbar li.completed:before { content: '✔'; border-color: #28a745; background: #28a745; color: #fff; }
+        .progressbar li.completed + li:after { background: #28a745; } /* 绿线连接 */
     </style>
 </head>
 <body>
@@ -146,6 +161,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <a href="../index.php" style="color:white; text-decoration:none;">&larr; Back to Home</a>
     </div>
 </nav>
+
+<div style="max-width: 600px; margin: 30px auto;">
+    <ul class="progressbar">
+        <li class="completed">View Details</li>
+        <li class="active">Select Dates</li>
+        <li>Payment</li>
+    </ul>
+</div>
 
 <div class="container-flex">
     

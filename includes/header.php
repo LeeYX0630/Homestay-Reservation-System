@@ -139,7 +139,7 @@ if (isset($_SESSION['user_id'])) {
                 <?php endif; ?>
 
             <?php endif; ?>
-            
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
           </div>
         </div>
       </div>

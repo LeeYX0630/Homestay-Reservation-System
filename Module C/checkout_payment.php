@@ -31,7 +31,7 @@ $date2 = new DateTime($check_out);
 $interval = $date1->diff($date2);
 $days = $interval->days == 0 ? 1 : $interval->days;
 
-// 【关键修改】使用 rooms 表里的 price_per_night 字段
+// 使用 rooms 表里的 price_per_night 字段
 $price_per_night = floatval($room['price_per_night']); 
 $original_total = $price_per_night * $days;
 
@@ -142,7 +142,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         if ($coupon_id_to_update > 0) {
             $conn->query("UPDATE user_coupons SET status = 'used' WHERE uc_id = '$coupon_id_to_update'");
         }
-        echo "<script>alert('Payment Successful!'); window.location.href='../Module A/user_dashboard.php';</script>";
+        
+        // ★ SweetAlert Success ★
+        $paid_amount = number_format($final_pay_amount, 2);
+        echo "
+        <!DOCTYPE html>
+        <html>
+        <head><script src='https://cdn.jsdelivr.net/npm/sweetalert2@11'></script></head>
+        <body>
+        <script>
+            Swal.fire({
+                title: 'Payment Successful!',
+                text: 'Thank you! Amount Paid: RM $paid_amount',
+                icon: 'success',
+                confirmButtonColor: '#28a745',
+                confirmButtonText: 'Go to Dashboard'
+            }).then((result) => {
+                window.location.href = '../Module A/user_dashboard.php';
+            });
+        </script>
+        </body>
+        </html>";
         exit();
     } else {
         $msg = "<div class='alert error'>Error: " . $conn->error . "</div>";
@@ -158,6 +178,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     <link rel="stylesheet" href="../css/style.css">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body { background-color: #f8f9fa; }
         .checkout-container { max-width: 900px; margin: 50px auto; display: flex; gap: 30px; }
@@ -176,6 +197,18 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
             70% { box-shadow: 0 0 0 10px rgba(255, 193, 7, 0); }
             100% { box-shadow: 0 0 0 0 rgba(255, 193, 7, 0); }
         }
+        
+        /* Progress Bar CSS */
+        .progressbar { counter-reset: step; padding: 0; display: flex; justify-content: space-between; list-style: none; position: relative; }
+        .progressbar li { width: 33.33%; position: relative; text-align: center; font-size: 13px; color: #ccc; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .progressbar li:before { content: counter(step); counter-increment: step; width: 30px; height: 30px; line-height: 28px; border: 2px solid #e0e0e0; background: #fff; display: block; text-align: center; margin: 0 auto 10px auto; border-radius: 50%; color: #ccc; font-weight: bold; z-index: 2; position: relative; }
+        .progressbar li:after { content: ''; position: absolute; width: 100%; height: 3px; background: #e0e0e0; top: 15px; left: -50%; z-index: 0; }
+        .progressbar li:first-child:after { content: none; }
+        .progressbar li.active { color: #333; }
+        .progressbar li.active:before { border-color: #28a745; background: #fff; color: #28a745; box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1); }
+        .progressbar li.completed { color: #28a745; }
+        .progressbar li.completed:before { content: '✔'; border-color: #28a745; background: #28a745; color: #fff; }
+        .progressbar li.completed + li:after { background: #28a745; }
     </style>
 </head>
 <body>
@@ -186,6 +219,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         <a href="../index.php" class="text-white text-decoration-none">Cancel</a>
     </div>
 </nav>
+
+<div style="max-width: 600px; margin: 30px auto;">
+    <ul class="progressbar">
+        <li class="completed">View Details</li>
+        <li class="completed">Select Dates</li>
+        <li class="active">Payment</li>
+    </ul>
+</div>
 
 <div class="container checkout-container">
     
@@ -287,20 +328,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
             <div class="mb-3">
                 <label class="form-label small fw-bold">Cardholder Name</label>
-                <input type="text" name="card_holder" class="form-control" placeholder="John Doe" required>
+                <input type="text" id="card_holder" name="card_holder" class="form-control" placeholder="John Doe" required>
             </div>
+            
             <div class="mb-3">
                 <label class="form-label small fw-bold">Card Number</label>
-                <input type="text" class="form-control" placeholder="0000 0000 0000 0000" maxlength="19" required>
+                <input type="text" id="cardNumber" class="form-control" placeholder="0000 0000 0000 0000" maxlength="19" required>
             </div>
+            
             <div class="row">
                 <div class="col-6 mb-3">
                     <label class="form-label small fw-bold">Expiry</label>
-                    <input type="text" class="form-control" placeholder="MM/YY" required>
+                    <input type="text" id="cardExpiry" class="form-control" placeholder="MM/YY" maxlength="5" required>
                 </div>
                 <div class="col-6 mb-3">
                     <label class="form-label small fw-bold">CVV</label>
-                    <input type="text" class="form-control" placeholder="123" maxlength="3" required>
+                    <input type="text" id="cardCvv" class="form-control" placeholder="123" maxlength="3" required>
                 </div>
             </div>
 
@@ -309,8 +352,32 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
             </button>
         </form>
     </div>
-
 </div>
+
+<script>
+    document.getElementById('cardNumber').addEventListener('input', function (e) {
+        let value = e.target.value.replace(/\D/g, '');
+        value = value.substring(0, 16); 
+        let formattedValue = value.match(/.{1,4}/g)?.join(' ') || value;
+        e.target.value = formattedValue;
+    });
+
+    document.getElementById('cardExpiry').addEventListener('input', function (e) {
+        let value = e.target.value.replace(/\D/g, '');
+        if (value.length > 2) {
+            value = value.substring(0, 2) + '/' + value.substring(2, 4);
+        }
+        e.target.value = value;
+    });
+
+    document.getElementById('cardCvv').addEventListener('input', function (e) {
+        e.target.value = e.target.value.replace(/\D/g, '').substring(0, 3);
+    });
+
+    document.getElementById('card_holder').addEventListener('input', function (e) {
+        e.target.value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+    });
+</script>
 
 </body>
 </html>
