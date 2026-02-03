@@ -40,24 +40,89 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_super'])) {
     }
 }
 
-// --- 3. 获取统计数据 (替换 HTML 中的假数据) ---
-// 总订单
 $res_count = $conn->query("SELECT COUNT(*) as total FROM bookings");
 $total_bookings = $res_count->fetch_assoc()['total'];
 
-// 总收入 (已确认订单)
 $res_revenue = $conn->query("SELECT SUM(total_price) as revenue FROM bookings WHERE booking_status = 'confirmed'");
 $total_revenue = $res_revenue->fetch_assoc()['revenue'] ?? 0;
 
-// 待入住 (未来订单)
 $today = date('Y-m-d');
 $res_upcoming = $conn->query("SELECT COUNT(*) as upcoming FROM bookings WHERE booking_status = 'confirmed' AND check_in_date >= '$today'");
 $upcoming_bookings = $res_upcoming->fetch_assoc()['upcoming'];
 
-// 获取最新的 5 条订单 (用于填充 Recent Orders 表格)
 $sql_recent = "SELECT b.*, r.room_name FROM bookings b JOIN rooms r ON b.room_id = r.room_id ORDER BY b.booking_id DESC LIMIT 5";
 $recent_orders = $conn->query($sql_recent);
+
+$days_data = [
+    'Monday' => 0, 'Tuesday' => 0, 'Wednesday' => 0, 
+    'Thursday' => 0, 'Friday' => 0, 'Saturday' => 0, 'Sunday' => 0
+];
+
+$days_data = [
+    'Monday' => 0, 'Tuesday' => 0, 'Wednesday' => 0, 
+    'Thursday' => 0, 'Friday' => 0, 'Saturday' => 0, 'Sunday' => 0
+];
+
+// 统计订单
+$sql_chart = "SELECT DAYNAME(check_in_date) as day_name, COUNT(*) as cnt 
+              FROM bookings 
+              WHERE booking_status = 'confirmed'
+              GROUP BY day_name";
+$res_chart = $conn->query($sql_chart);
+
+if ($res_chart) {
+    while ($row = $res_chart->fetch_assoc()) {
+        $day = trim($row['day_name']);
+        if (isset($days_data[$day])) {
+            $days_data[$day] = (int)$row['cnt']; // 强制转为数字
+        }
+    }
+}
+
+// 找出最大值用于Y轴
+$max_val = max(array_values($days_data)) + 1;
+
+// 构建 JSON 配置
+$chartConfig = [
+    'type' => 'bar',
+    'data' => [
+        'labels' => array_keys($days_data),
+        'datasets' => [[
+            'label' => 'Bookings',
+            'data' => array_values($days_data),
+            'backgroundColor' => 'rgba(13, 110, 253, 0.6)',
+            'borderColor' => 'rgba(13, 110, 253, 1)',
+            'borderWidth' => 1,
+            'borderRadius' => 5
+        ]]
+    ],
+    'options' => [
+        'plugins' => [
+            'legend' => ['display' => false],
+            'datalabels' => [
+                'anchor' => 'end',
+                'align' => 'top',
+                'color' => '#666',
+                'font' => ['weight' => 'bold']
+            ]
+        ],
+        'scales' => [
+            'y' => [
+                'beginAtZero' => true,
+                'suggestedMax' => $max_val,
+                'grid' => ['color' => 'rgba(0,0,0,0.05)']
+            ],
+            'x' => [
+                'grid' => ['display' => false]
+            ]
+        ]
+    ]
+];
+
+// 使用 rawurlencode 防止 URL 里的特殊字符报错
+$chartUrl = "https://quickchart.io/chart?c=" . rawurlencode(json_encode($chartConfig));
 ?>
+
 
 <!doctype html>
 <html lang="en">
@@ -104,23 +169,53 @@ $recent_orders = $conn->query($sql_recent);
         
         <nav id="sidebarMenu" class="col-md-3 col-lg-2 d-md-block bg-light sidebar collapse"> 
           <div class="position-sticky pt-3">
-            <ul class="nav flex-column">
+            
+            <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-2 mb-1 text-muted text-uppercase">
+              <span>Core</span>
+            </h6>
+            <ul class="nav flex-column mb-3">
               <li class="nav-item">
                 <a class="nav-link active" href="admin_dashboard.php">
                   <i class="bi bi-speedometer2 me-2"></i> Dashboard
                 </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="admin_manage_bookings.php">
-                  <i class="bi bi-file-earmark-text me-2"></i> Manage Bookings
+                <a class="nav-link text-dark" href="admin_manage_bookings.php">
+                  <i class="bi bi-calendar-check me-2"></i> Manage Bookings
                 </a>
               </li>
               <li class="nav-item">
-                <a class="nav-link" href="admin_manage_rooms.php">
+                <a class="nav-link text-dark" href="../Module A/admin_reset_user.php">
+                  <i class="bi bi-people me-2"></i> Manage Users
+                </a>
+              </li>
+            </ul>
+
+            <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-3 mb-1 text-muted text-uppercase">
+              <span>Inventory</span>
+            </h6>
+            <ul class="nav flex-column mb-3">
+              <li class="nav-item">
+                <a class="nav-link text-dark" href="../Module B/admin_manage_rooms.php">
                   <i class="bi bi-house-door me-2"></i> Manage Rooms
                 </a>
               </li>
-              
+              <li class="nav-item">
+                <a class="nav-link text-dark" href="../Module B/admin_manage_categories.php">
+                  <i class="bi bi-tags me-2"></i> Room Categories
+                </a>
+              </li>
+              <li class="nav-item">
+                <a class="nav-link text-dark" href="admin_manage_vouchers.php">
+                  <i class="bi bi-ticket-perforated me-2"></i> Manage Vouchers
+                </a>
+              </li>
+            </ul>
+
+            <h6 class="sidebar-heading d-flex justify-content-between align-items-center px-3 mt-3 mb-1 text-muted text-uppercase">
+              <span>System</span>
+            </h6>
+            <ul class="nav flex-column mb-2">
               <li class="nav-item">
                 <?php if ($_SESSION['role'] === 'superadmin'): ?>
                     <a class="nav-link text-success" href="add_admin.php">
@@ -212,12 +307,22 @@ $recent_orders = $conn->query($sql_recent);
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-12">
                 <div class="card border-0 shadow-sm">
                     <div class="card-body">
-                        <h5 class="card-title">Weekly Traffic (Demo Chart)</h5>
-                        <img src="https://quickchart.io/chart?c={type:'line',data:{labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],datasets:[{label:'Visitors',data:[50,60,70,180,190,200,150],borderColor:'blue',fill:false}]},options:{legend:{display:false}}}" class="img-fluid" style="max-height: 250px; width: 100%; object-fit: contain;" alt="Chart">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h5 class="card-title fw-bold text-secondary">
+                                <i class="bi bi-bar-chart-fill me-2"></i>Popular Check-in Days
+                            </h5>
+                            <span class="badge bg-light text-dark border">Real-time Data</span>
+                        </div>
+                        
+                        <img src="<?php echo $chartUrl; ?>" class="img-fluid rounded" style="max-height: 300px; width: 100%; object-fit: contain;" alt="Chart">
+                        
+                        <div class="text-center mt-3 text-muted small">
+                            Based on confirmed check-in dates.
+                        </div>
                     </div>
                 </div>
             </div>

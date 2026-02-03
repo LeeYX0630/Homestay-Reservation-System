@@ -1,5 +1,5 @@
 <?php
-//for resgister
+// Module A/register.php
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -9,18 +9,15 @@ if (isset($_SESSION['user_id'])) {
     require_once '../includes/db_connection.php';
     
     // Determine redirect link based on role
-    $dashboard_link = (isset($_SESSION['role']) && $_SESSION['role'] === 'Admin') ? 'admin_dashboard.php' : 'user_dashboard.php';
+    $dashboard_link = (isset($_SESSION['role']) && ($_SESSION['role'] === 'superadmin' || $_SESSION['role'] === 'admin')) ? '../Module C/admin_dashboard.php' : 'user_dashboard.php';
     
     $page_title = "Already Logged In";
-    include_once 'header.php'; 
+    include_once '../includes/header.php'; 
 ?>
     <div class="container mt-5 mb-5">
         <div class="row justify-content-center">
-            
             <div class="col-md-11 col-lg-10">
-                
                 <div class="card shadow-lg border-0 rounded-4 text-center p-5">
-                    
                     <div class="mb-4">
                         <i class="bi bi-person-check-fill text-success" style="font-size: 4rem;"></i>
                     </div>
@@ -49,13 +46,12 @@ if (isset($_SESSION['user_id'])) {
                             Sign Out & Register New
                         </a>
                     </div>
-                    
                 </div>
             </div>
         </div>
     </div>
 <?php
-    include_once 'footer.php';
+    include_once '../includes/footer.php';
     exit(); // Stop execution here
 }
 
@@ -66,18 +62,33 @@ $error = "";
 $success = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    // Sanitize input and limit length
+    // Sanitize input
     $full_name = substr(trim($_POST['full_name']), 0, 100);
     $email = substr(trim($_POST['email']), 0, 255);
-    $phone = substr(trim($_POST['phone']), 0, 20);
+    $phone = trim($_POST['phone']); // 暂时不截断，先验证
     $password = trim($_POST['password']);
     $confirm_password = trim($_POST['confirm_password']);
     
-    // Check if passwords match
-    if ($password !== $confirm_password) {
+    // --- 【修复 1】后端验证逻辑 ---
+
+    // A. 验证邮箱格式
+    if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $error = "Invalid email address format.";
+    }
+    // B. 验证电话号码 (只允许数字，且长度在 9-15 位之间)
+    elseif (!preg_match('/^[0-9]{9,15}$/', $phone)) {
+        $error = "Invalid phone number. Please enter only digits (9-15 numbers).";
+    }
+    // C. 验证密码长度
+    elseif (strlen($password) < 6) {
+        $error = "Password is too short. It must be at least 6 characters.";
+    }
+    // D. 验证密码匹配
+    elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
-    } else {
-        // Check for duplicate email or phone
+    } 
+    else {
+        // 全部验证通过，开始查重
         $checkStmt = $conn->prepare("SELECT email, phone FROM users WHERE email = ? OR phone = ?");
         $checkStmt->bind_param("ss", $email, $phone);
         $checkStmt->execute();
@@ -92,7 +103,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $error = "Phone number already used! Please use another.";
             }
         } else {
-            // Hash password and insert new user
+            // Hash password and insert
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             $role = 'Customer'; 
             
@@ -103,7 +114,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                  echo "<script>alert('Registration Successful!'); window.location.href='login.php';</script>";
                  exit();
             } else {
-                $error = "System Error. Please try again later.";
+                $error = "System Error: " . $conn->error;
             }
         }
         $checkStmt->close();
@@ -126,7 +137,9 @@ include_once '../includes/header.php';
                     </div>
                     
                     <?php if($error): ?>
-                        <div class="alert alert-danger rounded-3"><?php echo $error; ?></div>
+                        <div class="alert alert-danger rounded-3 text-center">
+                            <i class="bi bi-exclamation-triangle-fill me-2"></i> <?php echo $error; ?>
+                        </div>
                     <?php endif; ?>
 
                     <form method="POST" action="">
@@ -134,19 +147,21 @@ include_once '../includes/header.php';
                         <div class="mb-4">
                             <label class="form-label fw-bold small text-secondary">Full Name</label>
                             <input type="text" name="full_name" class="form-control form-control-lg bg-light border-0 py-3" 
-                                   required maxlength="100" placeholder="Your Full Name">
+                                   required maxlength="100" placeholder="Your Full Name" value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>">
                         </div>
 
                         <div class="mb-4">
                             <label class="form-label fw-bold small text-secondary">Phone Number</label>
-                            <input type="text" name="phone" class="form-control form-control-lg bg-light border-0 py-3" 
-                                   placeholder="e.g. 0123456789" required maxlength="20">
+                            <input type="tel" name="phone" class="form-control form-control-lg bg-light border-0 py-3" 
+                                   placeholder="e.g. 0123456789" required maxlength="15"
+                                   oninput="this.value = this.value.replace(/[^0-9]/g, '')"
+                                   value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>">
                         </div>
 
                         <div class="mb-4">
                             <label class="form-label fw-bold small text-secondary">Email Address</label>
                             <input type="email" name="email" class="form-control form-control-lg bg-light border-0 py-3" 
-                                   required maxlength="255" placeholder="name@example.com">
+                                   required maxlength="255" placeholder="name@example.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
                         </div>
 
                         <div class="mb-1"> 

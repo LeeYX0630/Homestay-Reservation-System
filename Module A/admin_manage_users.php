@@ -3,9 +3,8 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// 1. Safety check: must be Admin
-if (!isset($_SESSION['user_id']) || $_SESSION['role'] !== 'Admin') {
-    header("Location: login.php");
+if (!isset($_SESSION['admin_id'])) {
+    header("Location: admin_login.php");
     exit();
 }
 
@@ -124,4 +123,4 @@ include '../includes/header.php';
     </div>
 </div>
 
-<?php include 'footer.php'; ?>
+<?php include '../includes/footer.php'; ?>

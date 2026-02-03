@@ -116,7 +116,7 @@ include 'includes/header.php';
     <div class="hero-section">
         <h1>Welcome to Your Perfect Getaway</h1>
         <p style="font-size: 1.2em; margin-bottom: 40px;">Experience comfort and luxury at affordable prices.</p>
-        <a href="Module C/check_availability.php" class="cta-button">Book Now</a>
+        <a href="Module B/room_catalogue.php" class="cta-button">Book Now</a>
     </div>
 
     <div class="featured-container">
@@ -126,7 +126,6 @@ include 'includes/header.php';
             <?php
             if ($result->num_rows > 0) {
                 while($row = $result->fetch_assoc()) {
-                    // 处理图片路径，如果没有图片则使用默认占位符
                     $img_path = !empty($row['room_image']) ? "uploads/" . $row['room_image'] : "images/placeholder.jpg";
                     
                     echo '

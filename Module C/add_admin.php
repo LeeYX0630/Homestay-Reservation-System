@@ -1,54 +1,60 @@
 <?php
+// Module C/add_admin.php
 session_start();
 require_once '../includes/db_connection.php';
 
 // --- 安全检查：只有 Super Admin 才能进这个页面 ---
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'superadmin') {
-    // 如果不是 superadmin，直接踢回 dashboard，或者显示“权限不足”
     echo "<script>alert('Access Denied. Super Admin only.'); window.location.href='admin_dashboard.php';</script>";
     exit();
 }
-
-// 加在admin_login.php后面的代码示例：
-//$_SESSION['admin_id'] = $row['admin_id'];
-//$_SESSION['username'] = $row['username'];
-//$_SESSION['role'] = $row['role']; // <--- 这一步最关键！
-// ... 跳转到 dashboard ...
 
 $msg = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = trim($_POST['username']);
+    $email = trim($_POST['email']); 
+
+    $raw_phone = trim($_POST['phone']);
+    $phone = str_replace('-', '', $raw_phone);
     $full_name = trim($_POST['full_name']);
     $password = $_POST['password'];
     $confirm_password = $_POST['confirm_password'];
+    
+    $role = 'admin'; 
 
-    // 1. 基本验证
-    if (empty($username) || empty($password) || empty($full_name)) {
+    // 1. 验证逻辑
+    if (empty($username) || empty($email) || empty($phone) || empty($password) || empty($full_name)) {
         $msg = "<div class='alert error'>All fields are required.</div>";
+    } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+        $msg = "<div class='alert error'>Invalid email format.</div>";
+    } 
+    elseif (!preg_match('/^[0-9]{9,11}$/', $phone)) {
+        $msg = "<div class='alert error'>Invalid phone number (9-11 digits required).</div>";
+    }
+    elseif (strlen($password) < 6) {
+        $msg = "<div class='alert error'>Password must be at least 6 characters long.</div>";
     } elseif ($password !== $confirm_password) {
         $msg = "<div class='alert error'>Passwords do not match.</div>";
     } else {
-        // 2. 检查用户名是否已存在
-        $check_sql = "SELECT admin_id FROM admins WHERE username = ?";
+        $check_sql = "SELECT admin_id FROM admins WHERE username = ? OR email = ?";
         $stmt = $conn->prepare($check_sql);
-        $stmt->bind_param("s", $username);
+        $stmt->bind_param("ss", $username, $email);
         $stmt->execute();
         $stmt->store_result();
 
         if ($stmt->num_rows > 0) {
-            $msg = "<div class='alert error'>Username already taken.</div>";
+            $msg = "<div class='alert error'>Username or Email already taken.</div>";
         } else {
-            // 3. 密码加密 (Hashing) - 非常重要！
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
 
-            // 4. 插入数据库
-            $insert_sql = "INSERT INTO admins (username, password, full_name) VALUES (?, ?, ?)";
+            $insert_sql = "INSERT INTO admins (username, email, phone, password, full_name, role) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($insert_sql);
-            $stmt->bind_param("sss", $username, $hashed_password, $full_name);
+            
+            $stmt->bind_param("ssssss", $username, $email, $phone, $hashed_password, $full_name, $role);
 
             if ($stmt->execute()) {
-                $msg = "<div class='alert success'>New Admin added successfully!</div>";
+                $msg = "<div class='alert success'>New Admin ($username) added successfully!</div>";
             } else {
                 $msg = "<div class='alert error'>Error: " . $conn->error . "</div>";
             }
@@ -63,53 +69,142 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 <head>
     <meta charset="UTF-8">
     <title>Add New Admin</title>
-    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="../Module A/style.css"> 
     <style>
-        body { background-color: #f4f4f4; }
-        .form-container { max-width: 400px; margin: 50px auto; padding: 30px; background: white; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .form-group { margin-bottom: 15px; }
-        .form-group label { display: block; margin-bottom: 5px; font-weight: bold; }
-        .form-group input { width: 100%; padding: 10px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 4px; }
-        .btn-submit { width: 100%; padding: 10px; background-color: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        body { background-color: #f4f4f4; font-family: 'Segoe UI', sans-serif; }
+        .form-container { max-width: 500px; margin: 50px auto; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; margin-bottom: 8px; font-weight: 600; color: #333; }
+        .form-group input { width: 100%; padding: 12px; box-sizing: border-box; border: 1px solid #ddd; border-radius: 6px; font-size: 14px; }
+        .form-group input:focus { border-color: #007bff; outline: none; }
+        
+        .btn-submit { width: 100%; padding: 12px; background-color: #007bff; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; transition: 0.3s; }
         .btn-submit:hover { background-color: #0056b3; }
-        .alert { padding: 10px; margin-bottom: 15px; border-radius: 4px; text-align: center; }
-        .error { background-color: #f8d7da; color: #721c24; }
-        .success { background-color: #d4edda; color: #155724; }
-        .back-link { display: block; text-align: center; margin-top: 15px; text-decoration: none; color: #555; }
+        
+        .alert { padding: 12px; margin-bottom: 20px; border-radius: 6px; text-align: center; font-size: 14px; }
+        .error { background-color: #ffebee; color: #c62828; border: 1px solid #ef9a9a; }
+        .success { background-color: #e8f5e9; color: #2e7d32; border: 1px solid #a5d6a7; }
+        
+        .back-link { display: block; text-align: center; margin-top: 20px; text-decoration: none; color: #666; font-size: 14px; }
+        .back-link:hover { color: #333; text-decoration: underline; }
+
+        .strength-container { margin-top: 8px; height: 5px; background-color: #eee; border-radius: 3px; overflow: hidden; display: flex;}
+        .strength-bar { height: 100%; width: 0%; transition: width 0.3s ease, background-color 0.3s ease; }
+        .strength-text { font-size: 12px; margin-top: 5px; font-weight: bold; display: block; text-align: right; }
+        .strength-weak { background-color: #dc3545; }
+        .strength-medium { background-color: #ffc107; }
+        .strength-strong { background-color: #28a745; }
     </style>
 </head>
 <body>
 
 <div class="form-container">
-    <h2 style="text-align:center; margin-top:0;">Add New Admin</h2>
+    <h2 style="text-align:center; margin-top:0; margin-bottom: 30px; color:#333;">Add New Admin</h2>
     <?php echo $msg; ?>
 
     <form method="POST">
         <div class="form-group">
-            <label>Full Name</label>
-            <input type="text" name="full_name" required placeholder="e.g. System Manager">
+            <label>Full Name (Position)</label>
+            <input type="text" name="full_name" required placeholder="e.g. John Manager" value="<?php echo isset($_POST['full_name']) ? htmlspecialchars($_POST['full_name']) : ''; ?>">
         </div>
 
         <div class="form-group">
             <label>Username</label>
-            <input type="text" name="username" required placeholder="Login username">
+            <input type="text" name="username" required placeholder="For display purpose" value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username']) : ''; ?>">
+        </div>
+
+        <div class="form-group">
+            <label>Email Address (For Login)</label>
+            <input type="email" name="email" required placeholder="admin@homestay.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+        </div>
+
+<div class="form-group">
+            <label>Phone Number</label>
+            <input type="tel" name="phone" id="phoneInput" required placeholder="e.g. 012-3456789" 
+                   maxlength="12" 
+                   value="<?php echo isset($_POST['phone']) ? htmlspecialchars($_POST['phone']) : ''; ?>">
+            <small style="color:#666; font-size:0.8em;">* Format: 01x-xxxxxxx</small>
         </div>
 
         <div class="form-group">
             <label>Password</label>
-            <input type="password" name="password" required>
+            <input type="password" name="password" id="passwordInput" required placeholder="********">
+            
+            <div class="strength-container">
+                <div class="strength-bar" id="strengthBar"></div>
+            </div>
+            <span class="strength-text" id="strengthText"></span>
         </div>
 
         <div class="form-group">
             <label>Confirm Password</label>
-            <input type="password" name="confirm_password" required>
+            <input type="password" name="confirm_password" required placeholder="********">
         </div>
 
-        <button type="submit" class="btn-submit">Create Admin</button>
+        <button type="submit" class="btn-submit">Create Admin Account</button>
     </form>
 
     <a href="admin_dashboard.php" class="back-link">&larr; Back to Dashboard</a>
 </div>
+
+<script>
+    // --- 自动格式化电话号码 (012-3456789) ---
+    const phoneInput = document.getElementById('phoneInput');
+
+    phoneInput.addEventListener('input', function(e) {
+        let value = e.target.value.replace(/\D/g, '');
+        
+        if (value.length > 11) value = value.slice(0, 11);
+
+        if (value.length > 3) {
+            value = value.slice(0, 3) + '-' + value.slice(3);
+        }
+
+        e.target.value = value;
+    });
+
+    const passwordInput = document.getElementById('passwordInput');
+    const strengthBar = document.getElementById('strengthBar');
+    const strengthText = document.getElementById('strengthText');
+
+    passwordInput.addEventListener('input', function() {
+        const val = passwordInput.value;
+        let score = 0;
+
+        if (val.length >= 6) score += 1;
+        if (val.length >= 10) score += 1;
+        if (/[A-Z]/.test(val)) score += 1;
+        if (/[0-9]/.test(val)) score += 1;
+        if (/[^A-Za-z0-9]/.test(val)) score += 1;
+
+        strengthBar.className = 'strength-bar';
+        strengthText.textContent = '';
+
+        if (val.length === 0) {
+            strengthBar.style.width = '0%';
+        } else if (val.length < 6) {
+            strengthBar.style.width = '20%';
+            strengthBar.classList.add('strength-weak');
+            strengthText.textContent = 'Too Short';
+            strengthText.style.color = '#dc3545';
+        } else if (score < 3) {
+            strengthBar.style.width = '40%';
+            strengthBar.classList.add('strength-weak');
+            strengthText.textContent = 'Weak';
+            strengthText.style.color = '#dc3545';
+        } else if (score === 3 || score === 4) {
+            strengthBar.style.width = '70%';
+            strengthBar.classList.add('strength-medium');
+            strengthText.textContent = 'Medium';
+            strengthText.style.color = '#d39e00'; 
+        } else {
+            strengthBar.style.width = '100%';
+            strengthBar.classList.add('strength-strong');
+            strengthText.textContent = 'Strong';
+            strengthText.style.color = '#28a745';
+        }
+    });
+</script>
 
 </body>
 </html>
