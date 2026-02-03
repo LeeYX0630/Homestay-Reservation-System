@@ -1,13 +1,13 @@
 <?php
 /**
  * =========================================================
- * Admin Manage Rooms
+ * Admin Manage Rooms (Fix: Logic Bugs & SweetAlert Delete)
  * =========================================================
  */
 include '../includes/db_connection.php';
 include '../includes/header.php';
 
-$alertMessage = "";
+$swalCode = ""; // 用于存 JS 弹窗代码
 
 // 1. 图片上传函数
 function uploadImage($file) {
@@ -27,61 +27,103 @@ function uploadImage($file) {
     return false;
 }
 
-// 2. 处理保存 (Add / Edit)
+// 2. 删除逻辑 (Move to top for better handling)
+if (isset($_GET['delete'])) {
+    $id = $_GET['delete'];
+    
+    // 执行删除
+    $delSql = "DELETE FROM rooms WHERE room_id='$id'";
+    
+    if ($conn->query($delSql) === TRUE) {
+        // ★ SweetAlert Delete Success ★
+        $swalCode = "Swal.fire({
+            title: 'Deleted!',
+            text: 'The room has been deleted.',
+            icon: 'success',
+            confirmButtonColor: '#28a745'
+        }).then(() => {
+            window.location.href = 'admin_manage_rooms.php';
+        });";
+    } else {
+        $swalCode = "Swal.fire({ title: 'Error', text: '" . $conn->error . "', icon: 'error' });";
+    }
+}
+
+// 3. 处理保存 (Add / Edit)
 if (isset($_POST['save_room'])) {
     
     $id = $_POST['room_id'] ?? '';
     $name = $conn->real_escape_string($_POST['room_name']);
     $desc = $conn->real_escape_string($_POST['description']);
     $fac = $conn->real_escape_string($_POST['facilities']);
-    $min = $_POST['min_price'];
-    $max = $_POST['max_price'];
     
-    // 图片处理
-    $img_sql_part = "";
-    if (!empty($_FILES['room_image']['name'])) {
-        $uploaded_img = uploadImage($_FILES['room_image']);
-        if ($uploaded_img) {
-            $img_sql_part = ", room_image='$uploaded_img'";
-        }
-    }
-
-    if (!empty($id)) {
-        // UPDATE
-        $sql = "UPDATE rooms SET 
-                room_name='$name', 
-                description='$desc', 
-                facilities='$fac',
-                min_price='$min', 
-                max_price='$max' 
-                $img_sql_part 
-                WHERE room_id='$id'";
-                
-        if ($conn->query($sql)) {
-            $alertMessage = "alert('Room updated successfully!'); window.location.href='admin_manage_rooms.php';";
-        } else {
-            $alertMessage = "alert('Error Updating: " . $conn->error . "');";
-        }
+    // 强制转为浮点数
+    $min = floatval($_POST['min_price']);
+    $max = floatval($_POST['max_price']);
+    
+    // ★★★ 修复 1 & 2: 逻辑验证 ★★★
+    if ($min < 0 || $max < 0) {
+        $swalCode = "Swal.fire({ title: 'Invalid Price', text: 'Prices cannot be negative!', icon: 'error', confirmButtonColor: '#d33' });";
+    } elseif ($min > $max) {
+        $swalCode = "Swal.fire({ title: 'Logic Error', text: 'Min Price cannot be greater than Max Price!', icon: 'error', confirmButtonColor: '#d33' });";
     } else {
-        // INSERT
-        $img_name = (!empty($_FILES['room_image']['name'])) ? uploadImage($_FILES['room_image']) : '';
+        // 验证通过，继续处理图片
+        $img_sql_part = "";
+        $img_name = "";
         
-        $sql = "INSERT INTO rooms (room_name, description, facilities, room_image, min_price, max_price) 
-                VALUES ('$name', '$desc', '$fac', '$img_name', '$min', '$max')";
-        
-        if ($conn->query($sql)) {
-            $alertMessage = "alert('New Room added successfully!'); window.location.href='admin_manage_rooms.php';";
+        if (!empty($_FILES['room_image']['name'])) {
+            $uploaded = uploadImage($_FILES['room_image']);
+            if ($uploaded) {
+                $img_name = $uploaded;
+                $img_sql_part = ", room_image='$uploaded'";
+            } else {
+                // 如果上传失败，可以警告，但这里我们暂且继续，只是不存图片
+            }
+        }
+
+        if (!empty($id)) {
+            // --- UPDATE ---
+            $sql = "UPDATE rooms SET 
+                    room_name='$name', 
+                    description='$desc', 
+                    facilities='$fac',
+                    min_price='$min', 
+                    max_price='$max' 
+                    $img_sql_part 
+                    WHERE room_id='$id'";
+                    
+            if ($conn->query($sql)) {
+                $swalCode = "Swal.fire({ 
+                    title: 'Edit Complete', 
+                    text: 'Room details updated successfully.', 
+                    icon: 'success', 
+                    confirmButtonColor: '#28a745' 
+                }).then(() => {
+                    window.location.href = 'admin_manage_rooms.php';
+                });";
+            } else {
+                $swalCode = "Swal.fire({ title: 'Error', text: '" . $conn->error . "', icon: 'error', confirmButtonColor: '#d33' });";
+            }
         } else {
-            $alertMessage = "alert('Error Inserting: " . $conn->error . "');";
+            // --- INSERT ---
+            // 如果是 Add 模式且没上传图片，img_name 为空字符串
+            $sql = "INSERT INTO rooms (room_name, description, facilities, room_image, min_price, max_price) 
+                    VALUES ('$name', '$desc', '$fac', '$img_name', '$min', '$max')";
+            
+            if ($conn->query($sql)) {
+                $swalCode = "Swal.fire({ 
+                    title: 'Add Complete', 
+                    text: 'New room added successfully!', 
+                    icon: 'success', 
+                    confirmButtonColor: '#28a745' 
+                }).then(() => {
+                    window.location.href = 'admin_manage_rooms.php';
+                });";
+            } else {
+                $swalCode = "Swal.fire({ title: 'Error', text: '" . $conn->error . "', icon: 'error', confirmButtonColor: '#d33' });";
+            }
         }
     }
-}
-
-// 3. 删除逻辑
-if (isset($_GET['delete'])) {
-    $id = $_GET['delete'];
-    $conn->query("DELETE FROM rooms WHERE room_id='$id'");
-    echo "<script>alert('Room deleted successfully.'); window.location.href='admin_manage_rooms.php';</script>";
 }
 
 // 4. 筛选逻辑
@@ -114,70 +156,40 @@ if (count($where_clauses) > 0) {
 <head>
     <meta charset="UTF-8">
     <title>Manage Rooms</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
     <style>
-        /* CSS Styles */
+        /* CSS Styles (No Change) */
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
         .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
         h2 { text-align: center; color: #333; margin-bottom: 20px; margin-top:10px; }
-
-        /* Filter Bar */
         .filter-bar { background: #fff; padding: 20px; margin-bottom: 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); display: flex; gap: 15px; align-items: flex-end; flex-wrap: wrap; }
         .filter-group { display: flex; flex-direction: column; }
         .filter-group label { font-size: 12px; font-weight: bold; margin-bottom: 5px; color: #555; white-space: nowrap; }
         .filter-group input { padding: 8px; border: 1px solid #ccc; border-radius: 4px; height: 38px; box-sizing: border-box; width: 200px; margin: 0; }
         .btn-filter { height: 38px; padding: 0 20px; background-color: #28a745; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
         .btn-clear { height: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0 20px; background-color: #dc3545; color: white; text-decoration: none; border-radius: 4px; font-weight: bold; font-size: 14px; box-sizing: border-box; }
-
-        /* Action Bar */
         .action-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; background: #fff; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .list-title { font-size: 20px; font-weight: bold; color: #333; margin: 0; }
         .btn-add-new { height: 40px; background: #28a745; color: white; padding: 0 20px; border-radius: 4px; font-weight: bold; border: 1px solid #28a745; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-decoration: none; font-size: 14px; box-sizing: border-box; }
-
-        /* Grid */
-        .admin-grid { 
-            display: grid; 
-            grid-template-columns: repeat(3, 1fr); 
-            gap: 30px; 
-            /* ★ Solution: 增加底部间距 ★ */
-            margin-bottom: 30px; 
-        }
-        
+        .admin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 30px; margin-bottom: 30px; }
         .room-card { background-color: #fff; border-radius: 8px; overflow: hidden; box-shadow: 0 4px 15px rgba(0,0,0,0.05); border: 1px solid #e0e0e0; display: flex; flex-direction: column; transition: transform 0.3s ease; }
         .room-card:hover { transform: translateY(-5px); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
-        
         .card-image { width: 100%; height: 200px; background-color: #eee; overflow: hidden; }
         .card-image img { width: 100%; height: 100%; object-fit: cover; transition: transform 0.5s ease; }
         .room-card:hover .card-image img { transform: scale(1.05); }
-        
-        /* ★ New Class for "Image Not Available" ★ */
-        .no-image-text {
-            width: 100%;
-            height: 100%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background-color: #e9ecef;
-            color: #6c757d;
-            font-weight: bold;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
+        .no-image-text { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; background-color: #e9ecef; color: #6c757d; font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
         .card-content { padding: 20px; flex-grow: 1; display: flex; flex-direction: column; }
         .card-title { font-size: 18px; font-weight: bold; color: #333; margin: 0 0 10px 0; }
-        
         .room-price { font-size: 18px; color: #28a745; font-weight: bold; margin-bottom: 15px; }
         .room-price span { font-size: 14px; color: #999; font-weight: normal; }
-
         .card-info { font-size: 13px; color: #666; margin-bottom: 15px; line-height: 1.5; }
         .card-info strong { color: #333; }
         .card-actions { margin-top: auto; border-top: 1px solid #eee; padding-top: 15px; display: flex; gap: 10px; }
         .btn-card { flex: 1; text-align: center; padding: 10px 0; border-radius: 4px; font-weight: bold; text-decoration: none; font-size: 13px; cursor: pointer; border: none; color: white; display: inline-block;}
         .btn-edit { background-color: #28a745; }
         .btn-del { background-color: #dc3545; }
-
-        /* Modal */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 9999; justify-content: center; align-items: center; }
         .modal-content { background: #fff; padding: 25px; width: 500px; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); animation: slideDown 0.3s ease-out; position: relative; }
         @keyframes slideDown { from { transform: translateY(-50px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
@@ -187,12 +199,29 @@ if (count($where_clauses) > 0) {
         .form-group label { display: block; margin-bottom: 5px; font-weight: bold; color: #555; }
         .form-group input[type="text"], .form-group input[type="number"], .form-group textarea, .form-group input[type="file"] { width: 100%; padding: 10px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
         .btn-save { width: 100%; padding: 12px; background: #28a745; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; }
-        
         .form-row { display: flex; gap: 15px; }
         .form-row .col { flex: 1; }
     </style>
 
     <script>
+        // ★ 修复 3: 删除确认弹窗函数 ★
+        function confirmDelete(id) {
+            Swal.fire({
+                title: 'Are you sure?',
+                text: "You won't be able to revert this!",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#dc3545', // Red
+                cancelButtonColor: '#333',
+                confirmButtonText: 'Yes, delete it!'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    // 跳转去 PHP 处理删除
+                    window.location.href = 'admin_manage_rooms.php?delete=' + id;
+                }
+            })
+        }
+
         function openModal(mode, data = {}) {
             document.getElementById('modalTitle').innerText = mode === 'edit' ? 'Edit Room Details' : 'Add New Room';
             document.getElementById('roomId').value = data.id || '';
@@ -219,7 +248,6 @@ if (count($where_clauses) > 0) {
             if (event.target == document.getElementById('roomModal')) closeModal();
         }
     </script>
-    <?php if(!empty($alertMessage)) { echo "<script>$alertMessage</script>"; } ?>
 </head>
 <body>
 
@@ -265,7 +293,6 @@ if (count($where_clauses) > 0) {
         if ($result && $result->num_rows > 0) {
             while($row = $result->fetch_assoc()) {
                 
-                // ★ 1. 检查是否有图片
                 $hasImage = !empty($row['room_image']);
                 $img_src = $hasImage ? "../uploads/" . $row['room_image'] : "";
                 
@@ -311,7 +338,8 @@ if (count($where_clauses) > 0) {
 
                         <div class="card-actions">
                             <button class="btn-card btn-edit" onclick='openModal("edit", <?php echo $jsData; ?>)'>EDIT</button>
-                            <a href="admin_manage_rooms.php?delete=<?php echo $row['room_id']; ?>" class="btn-card btn-del" onclick="return confirm('Are you sure?')">DELETE</a>
+                            
+                            <button class="btn-card btn-del" onclick="confirmDelete(<?php echo $row['room_id']; ?>)">DELETE</button>
                         </div>
                     </div>
                 </div>
@@ -370,6 +398,8 @@ if (count($where_clauses) > 0) {
         </form>
     </div>
 </div>
+
+<?php if (!empty($swalCode)) { echo "<script>$swalCode</script>"; } ?>
 
 <?php include '../includes/footer.php'; ?>
 
