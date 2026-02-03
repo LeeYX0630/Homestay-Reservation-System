@@ -37,12 +37,21 @@ if (isset($_POST['save_data'])) {
     $cat_id = $_POST['cat_id_hidden'] ?? '';
     $room_id_select = $_POST['homestay_select']; 
     $cat_name = $_POST['category_select'];       
-    $price = $_POST['price_per_night'];
-    $pax = $_POST['max_pax'];
+    
+    // 【修复 1】强制转换为数字类型
+    $price = floatval($_POST['price_per_night']);
+    $pax = intval($_POST['max_pax']);
+    
     $desc = $conn->real_escape_string($_POST['description']);
 
     if ($cat_name === 'other') {
         $cat_name = $conn->real_escape_string($_POST['category_new_input']);
+    }
+
+    // 【修复 2】后端验证：如果发现负数，直接拦截
+    if ($price < 0 || $pax < 0) {
+        echo "<script>alert('Error: Price and Pax cannot be negative numbers!'); window.location.href='admin_manage_categories.php';</script>";
+        exit();
     }
 
     $operation_success = false;
@@ -77,9 +86,8 @@ if (isset($_POST['save_data'])) {
         }
     }
 
-    // ★ 关键修复：同步更新 Rooms 表的价格范围 (Sync Logic) ★
+    // 同步更新 Rooms 表的价格范围
     if ($operation_success) {
-        // 1. 计算该民宿下所有分类的最低和最高价
         $sync_sql = "SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p 
                      FROM categories WHERE room_id='$room_id_select'";
         $sync_res = $conn->query($sync_sql);
@@ -88,11 +96,9 @@ if (isset($_POST['save_data'])) {
         $new_min = $sync_row['min_p'] ?? 0;
         $new_max = $sync_row['max_p'] ?? 0;
 
-        // 2. 更新 rooms 表
         $update_room_sql = "UPDATE rooms SET min_price='$new_min', max_price='$new_max' WHERE room_id='$room_id_select'";
         $conn->query($update_room_sql);
         
-        // 3. 刷新页面以显示更改
         echo "<script>$alertMessage window.location.href='admin_manage_categories.php';</script>";
         exit();
     }
@@ -104,16 +110,14 @@ if (isset($_POST['save_data'])) {
 if (isset($_GET['delete'])) {
     $id = $_GET['delete'];
     
-    // 获取 room_id 以便更新价格
     $get_rid = $conn->query("SELECT room_id FROM categories WHERE category_id='$id'");
     if ($get_rid->num_rows > 0) {
         $rid_row = $get_rid->fetch_assoc();
         $r_id = $rid_row['room_id'];
 
-        // 删除
         $conn->query("DELETE FROM categories WHERE category_id='$id'");
         
-        // ★ 同步更新 Rooms 表 ★
+        // 同步更新
         $sync_sql = "SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p 
                      FROM categories WHERE room_id='$r_id'";
         $sync_res = $conn->query($sync_sql);
@@ -136,7 +140,6 @@ if (isset($_GET['delete'])) {
     <meta charset="UTF-8">
     <title>Manage Homestays</title>
     <style>
-        /* ... (请保留你原来文件里的 CSS 代码) ... */
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
         .container { max-width: 1300px; margin: 40px auto; padding: 0 20px; }
         h2 { text-align: center; color: #333; margin-bottom: 20px; }
@@ -395,12 +398,12 @@ if (isset($_GET['delete'])) {
 
             <div class="form-group">
                 <label>Price Per Night (RM)</label>
-                <input type="number" step="0.01" name="price_per_night" id="roomPrice" required placeholder="0.00">
+                <input type="number" step="0.01" min="0" name="price_per_night" id="roomPrice" required placeholder="0.00">
             </div>
 
             <div class="form-group">
                 <label>Max Pax</label>
-                <input type="number" name="max_pax" id="catPax" required placeholder="2">
+                <input type="number" min="1" name="max_pax" id="catPax" required placeholder="2">
             </div>
 
             <div class="form-group">
