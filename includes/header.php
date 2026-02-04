@@ -135,11 +135,11 @@ if (isset($_SESSION['user_id'])) {
                 
                 <?php if (!in_array($current_page, $auth_pages)): ?>
                     <a href="<?php echo $path_mod_a; ?>login.php" class="btn btn-outline-light btn-sm me-2 px-3">Login</a>
-                    <a href="<?php echo $path_mod_a; ?>register.php" class="btn btn-warning btn-sm px-3 fw-bold text-dark">Join</a>
+                    <a href="<?php echo $path_mod_a; ?>register.php" class="btn btn-warning btn-sm px-3 fw-bold text-dark">Sign up</a>
                 <?php endif; ?>
 
             <?php endif; ?>
-            
+            <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
           </div>
         </div>
       </div>
