@@ -155,6 +155,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 <div class="strength-bar" id="strengthBar"></div>
             </div>
             <span class="strength-text" id="strengthText"></span>
+            <small id="passwordSuggestions" style="color:#666; font-size:0.8em;"></small>
         </div>
 
         <div class="form-group">
@@ -193,6 +194,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     const passwordInput = document.getElementById('passwordInput');
     const strengthBar = document.getElementById('strengthBar');
     const strengthText = document.getElementById('strengthText');
+    const passwordSuggestions = document.getElementById('passwordSuggestions');
 
     passwordInput.addEventListener('input', function() {
         const val = passwordInput.value;
@@ -205,7 +207,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         strengthBar.className = 'strength-bar';
         strengthText.textContent = '';
+        passwordSuggestions.textContent = '';
 
+        let suggestions = [];
         if (val.length === 0) {
             strengthBar.style.width = '0%';
         } else if (val.length < 6) {
@@ -213,22 +217,33 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             strengthBar.classList.add('strength-weak');
             strengthText.textContent = 'Too Short';
             strengthText.style.color = '#dc3545';
-        } else if (score < 3) {
-            strengthBar.style.width = '40%';
-            strengthBar.classList.add('strength-weak');
-            strengthText.textContent = 'Weak';
-            strengthText.style.color = '#dc3545';
-        } else if (score === 3 || score === 4) {
-            strengthBar.style.width = '70%';
-            strengthBar.classList.add('strength-medium');
-            strengthText.textContent = 'Medium';
-            strengthText.style.color = '#d39e00'; 
+            suggestions.push('Password must be at least 6 characters long.');
         } else {
-            strengthBar.style.width = '100%';
-            strengthBar.classList.add('strength-strong');
-            strengthText.textContent = 'Strong';
-            strengthText.style.color = '#28a745';
+            if (score < 3) {
+                strengthBar.style.width = '40%';
+                strengthBar.classList.add('strength-weak');
+                strengthText.textContent = 'Weak';
+                strengthText.style.color = '#dc3545';
+                if (!/[A-Z]/.test(val)) suggestions.push('Add uppercase letters.');
+                if (!/[0-9]/.test(val)) suggestions.push('Add numbers.');
+                if (!/[^A-Za-z0-9]/.test(val)) suggestions.push('Add special characters (e.g., !@#$%).');
+            } else if (score === 3 || score === 4) {
+                strengthBar.style.width = '70%';
+                strengthBar.classList.add('strength-medium');
+                strengthText.textContent = 'Medium';
+                strengthText.style.color = '#d39e00';
+                if (!/[A-Z]/.test(val)) suggestions.push('Add uppercase letters for stronger password.');
+                if (!/[0-9]/.test(val)) suggestions.push('Add numbers for stronger password.');
+                if (!/[^A-Za-z0-9]/.test(val)) suggestions.push('Add special characters for stronger password.');
+            } else {
+                strengthBar.style.width = '100%';
+                strengthBar.classList.add('strength-strong');
+                strengthText.textContent = 'Strong';
+                strengthText.style.color = '#28a745';
+                suggestions.push('Great password!');
+            }
         }
+        passwordSuggestions.textContent = suggestions.join(' ');
     });
 
     <?php if (!empty($sweetAlertCode)) { echo $sweetAlertCode; } ?>
