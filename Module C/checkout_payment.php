@@ -139,12 +139,16 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
                    VALUES ('$user_id', '$room_id', '$check_in', '$check_out', '$final_pay_amount', 'confirmed', 'paid')";
 
     if ($conn->query($sql_insert) === TRUE) {
+        // 获取刚生成的订单 ID
+        $new_booking_id = $conn->insert_id;
+
         if ($coupon_id_to_update > 0) {
             $conn->query("UPDATE user_coupons SET status = 'used' WHERE uc_id = '$coupon_id_to_update'");
         }
         
-        // ★ SweetAlert Success ★
         $paid_amount = number_format($final_pay_amount, 2);
+        
+        // 跳转到 payment_success.php
         echo "
         <!DOCTYPE html>
         <html>
@@ -156,9 +160,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
                 text: 'Thank you! Amount Paid: RM $paid_amount',
                 icon: 'success',
                 confirmButtonColor: '#28a745',
-                confirmButtonText: 'Go to Dashboard'
+                confirmButtonText: 'View Receipt'
             }).then((result) => {
-                window.location.href = '../Module A/user_dashboard.php';
+                window.location.href = 'payment_success.php?booking_id=$new_booking_id';
             });
         </script>
         </body>
@@ -167,7 +171,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     } else {
         $msg = "<div class='alert error'>Error: " . $conn->error . "</div>";
     }
-}
+} // ★★★ 之前这里少了这一行大括号，导致报错！ ★★★
 ?>
 
 <!DOCTYPE html>
