@@ -1,13 +1,8 @@
 <?php
-/**
- * =========================================================
- * Room Details Page
- * =========================================================
- */
 include '../includes/db_connection.php';
 include '../includes/header.php';
 
-// 1. Check URL
+// Check URL
 if (!isset($_GET['room_id']) || empty($_GET['room_id'])) {
     echo "<script>alert('No Room Selected'); window.location.href='room_catalogue.php';</script>";
     exit;
@@ -15,7 +10,7 @@ if (!isset($_GET['room_id']) || empty($_GET['room_id'])) {
 
 $room_id = intval($_GET['room_id']); 
 
-// 2. Get Homestay Data
+// Get Homestay Data
 $sql_room = "SELECT * FROM rooms WHERE room_id = '$room_id'";
 $res_room = $conn->query($sql_room);
 
@@ -28,8 +23,6 @@ if ($res_room->num_rows == 0) {
 $room = $res_room->fetch_assoc();
 $room_img = !empty($room['room_image']) ? "../uploads/" . $room['room_image'] : "../assets/images/placeholder.jpg";
 
-// ★ 3. 检查当前用户角色 (是否为 Admin) ★
-// 确保你的 session 里存的是 'role'，并且值为 'admin'
 $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
 ?>
 
@@ -42,7 +35,7 @@ $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        /* CSS */
+
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; color: #333; margin: 0; padding: 0; }
         
         .detail-container { 
@@ -51,7 +44,6 @@ $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
             padding: 0 30px; 
         }
         
-        /* Back Button */
         .btn-back { 
             display: inline-flex; align-items: center; margin-bottom: 20px; 
             color: #555; text-decoration: none; font-weight: bold; font-size: 14px; 
@@ -60,7 +52,6 @@ $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
         }
         .btn-back:hover { background-color: #dde2e6; color: #333; transform: translateX(-3px); }
 
-        /* --- Homestay Header --- */
         .homestay-header {
             background: #fff;
             border-radius: 10px;
@@ -128,7 +119,6 @@ $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
             color: #555; 
         }
 
-        /* --- Category List --- */
         .section-title { 
             font-size: 24px; font-weight: bold; margin-bottom: 20px; 
             border-left: 5px solid #333; padding-left: 15px; color: #333; 
@@ -163,7 +153,6 @@ $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
         .cat-price { font-size: 22px; font-weight: bold; color: #28a745; display: block; margin-bottom: 10px; }
         .cat-price span { font-size: 13px; color: #999; font-weight: normal; }
         
-        /* Button Style */
         .btn-book {
             background-color: #333;
             color: white;
@@ -256,16 +245,16 @@ $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
                         </span>
                         
                         <?php 
-                        // ★ 判断 Admin ★
+                        // Check if user is admin
                         if ($isAdmin) {
-                            // Admin 点击：不跳转，弹窗
+                            
                             ?>
                             <button type="button" onclick="showAdminWarning()" class="btn-book">
                                 BOOK NOW
                             </button>
                             <?php
                         } else {
-                            // User 点击：正常跳转
+                        
                             ?>
                             <a href="../Module C/check_availability.php?category_id=<?php echo $cat['category_id']; ?>" class="btn-book">
                                 BOOK NOW
@@ -290,11 +279,11 @@ $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
 <script>
     function showAdminWarning() {
         Swal.fire({
-            title: "Admin can't be booking", // 你的文字
-            icon: "warning",                 // 图标
-            confirmButtonColor: "#28a745",   // 绿色按钮
-            confirmButtonText: "OK",         // 按钮文字
-            width: '400px'                   // 弹窗宽度
+            title: "Admin can't be booking", 
+            icon: "warning",                 
+            confirmButtonColor: "#28a745",  
+            confirmButtonText: "OK",         
+            width: '400px'                   
         });
     }
 </script>

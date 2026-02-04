@@ -9,7 +9,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_contact'])) {
     $email = trim($_POST['email']);
     $message = trim($_POST['message']);
 
-    // --- 1. 验证逻辑 ---
+    // --- Validation ---
     if (empty($name)) {
         $swalCode = "Swal.fire({ title: 'Opps...', text: 'Please tell me your name', icon: 'warning', confirmButtonColor: '#333' });";
     } 
@@ -23,7 +23,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_contact'])) {
         $swalCode = "Swal.fire({ title: 'Empty Message', text: 'Please enter your message', icon: 'warning', confirmButtonColor: '#333' });";
     } 
     else {
-        // --- 2. 写入数据库 ---
+        // --- Insert into database for contant us---
         $clean_name = $conn->real_escape_string($name);
         $clean_email = $conn->real_escape_string($email);
         $clean_message = $conn->real_escape_string($message);
@@ -31,7 +31,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_contact'])) {
         $sql = "INSERT INTO contact_us (name, email, message) VALUES ('$clean_name', '$clean_email', '$clean_message')";
 
         if ($conn->query($sql) === TRUE) {
-            // ★★★ 成功弹窗 ★★★
+            // Success Alert
             $swalCode = "Swal.fire({ 
                 title: 'Submit Successfully', 
                 text: 'Thank you! We will get back to you soon.', 
@@ -39,8 +39,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_contact'])) {
                 confirmButtonColor: '#28a745' 
             });";
 
-            // ★★★ 核心修改：成功后清空数据 ★★★
-            // 这样下面的 HTML input value 就会变回空白
+            // Clear form data after successful submission
             $_POST = array(); 
             $name = "";
             $email = "";
@@ -63,7 +62,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_contact'])) {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        /* CSS 保持不变，为了节省篇幅我省略了重复的 CSS 代码 */
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #FFFFFF; margin: 0; padding: 0; color: #333; }
         .container { max-width: 1200px; margin: 0 auto; padding: 40px 20px; }
         h1, h2 { text-align: center; color: #333; }

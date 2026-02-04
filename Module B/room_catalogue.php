@@ -1,17 +1,12 @@
 <?php
-/**
- * =========================================================
- * 1. 包含连接
- * =========================================================
- */
+
 include '../includes/db_connection.php'; 
 include '../includes/header.php';
 
-// 初始化搜索
 $search_query = "";
 $where_clause = "";
 
-// 搜索逻辑 (搜民宿名字 或 描述)
+// Search functionality
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $search_query = $conn->real_escape_string($_GET['search']);
     $where_clause = "WHERE room_name LIKE '%$search_query%' OR description LIKE '%$search_query%'";
@@ -25,9 +20,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Room Catalogue</title>
     <style>
-        /* =========================================
-           CSS 样式
-           ========================================= */
+ 
         body {
             font-family: 'Segoe UI', Arial, sans-serif;
             background-color: #f4f6f9;
@@ -156,12 +149,7 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
 
     <div class="room-grid">
         <?php
-        /**
-         * =========================================================
-         * ★ 修正逻辑：直接读取 rooms 表的所有数据 ★
-         * - 包含 room_image, description, facilities, min_price, max_price
-         * =========================================================
-         */
+        // 3. Fetch rooms from database with search filter
         $sql = "SELECT rooms.*, 
                        (SELECT COUNT(*) FROM categories WHERE categories.room_id = rooms.room_id) as cat_count
                 FROM rooms 
@@ -173,17 +161,17 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
         if ($result && $result->num_rows > 0) {
             while($row = $result->fetch_assoc()) {
                 
-                // 1. 处理图片 (优先显示 rooms 表里的图片)
+                // room image
                 $img_name = $row['room_image'];
                 if (!empty($img_name)) {
-                    // 假设图片在 uploads 文件夹
+
                     $img_src = "../uploads/" . $img_name;
                 } else {
-                    // 默认图
+
                     $img_src = "../assets/images/placeholder.jpg"; 
                 }
                 
-                // 2. 价格范围
+                // show price arrangement(max/min)
                 $min = $row['min_price'];
                 $max = $row['max_price'];
                 $price_display = "";
@@ -196,11 +184,11 @@ if (isset($_GET['search']) && !empty($_GET['search'])) {
                     $price_display = "RM " . number_format($min, 2) . " - " . number_format($max, 2);
                 }
 
-                // 3. 描述和设施
+                // show description and facilities
                 $desc = !empty($row['description']) ? substr($row['description'], 0, 60) . '...' : 'Enjoy a comfortable stay.';
                 $facilities = !empty($row['facilities']) ? $row['facilities'] : 'Standard Amenities';
 
-                // 4. 房型数量
+                // 4. category count
                 $count = $row['cat_count'];
                 ?>
                 

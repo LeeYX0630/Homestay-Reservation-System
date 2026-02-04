@@ -2,7 +2,7 @@
 include '../includes/db_connection.php';
 include '../includes/header.php';
 
-$swalCode = ""; // 存 JS 弹窗代码
+$swalCode = "";
 
 // =======================================================
 //  1. 删除逻辑 (Delete)
@@ -18,7 +18,7 @@ if (isset($_GET['delete'])) {
 
         $conn->query("DELETE FROM categories WHERE category_id='$id'");
         
-        // 同步更新 Room 价格
+        // Update homestay table price limits
         $sync_sql = "SELECT MIN(price_per_night) as min_p, MAX(price_per_night) as max_p FROM categories WHERE room_id='$r_id'";
         $sync_res = $conn->query($sync_sql);
         $sync_row = $sync_res->fetch_assoc();
@@ -64,7 +64,7 @@ if (isset($_POST['save_data'])) {
         }
     }
 
-    // 获取 Room 价格限制
+    // Gwet room price limits
     $limit_sql = "SELECT min_price, max_price FROM rooms WHERE room_id='$target_room_id'";
     $limit_res = $conn->query($limit_sql);
     $limit_row = $limit_res->fetch_assoc();
@@ -72,7 +72,7 @@ if (isset($_POST['save_data'])) {
     $room_min = floatval($limit_row['min_price']);
     $room_max = floatval($limit_row['max_price']);
 
-    // 验证逻辑
+    // valitation Logic
     if ($price < 0 || $pax < 0) {
         $swalCode = "Swal.fire({ title: 'Error', text: 'Price and Pax cannot be negative!', icon: 'error', confirmButtonColor: '#d33' });";
     } elseif (empty($cat_name)) {
@@ -85,7 +85,7 @@ if (isset($_POST['save_data'])) {
         $successTitle = "";
 
         if (!empty($cat_id)) {
-            // Edit
+            // Edit Functionality
             $check = $conn->query("SELECT category_id FROM categories WHERE room_id='$target_room_id' AND category_name='$cat_name' AND category_id != '$cat_id'");
             if ($check->num_rows > 0) {
                 $swalCode = "Swal.fire({ title: 'Duplicate Name', text: 'This name is already used in this Homestay.', icon: 'warning', confirmButtonColor: '#333' });";
@@ -103,7 +103,7 @@ if (isset($_POST['save_data'])) {
                 }
             }
         } else {
-            // Add
+            // Add New Functionality
             $check = $conn->query("SELECT category_id FROM categories WHERE room_id='$target_room_id' AND category_name='$cat_name'");
             if ($check->num_rows > 0) {
                 $swalCode = "Swal.fire({ title: 'Duplicate', text: 'This Homestay already has a category named $cat_name.', icon: 'warning', confirmButtonColor: '#333' });";
@@ -132,7 +132,7 @@ if (isset($_POST['save_data'])) {
 }
 
 // =======================================================
-//  3. 筛选逻辑
+//  3. 过滤和搜索逻辑 (Filter & Search)
 // =======================================================
 $where_clauses = [];
 if (isset($_GET['search']) && !empty($_GET['search'])) {
@@ -170,7 +170,6 @@ if (count($where_clauses) > 0) {
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
         .container { max-width: 1300px; margin: 40px auto; padding: 0 20px; }
         
-        /* ★ Back Button Style (保持一致) ★ */
         .btn-back { 
             display: inline-flex; align-items: center; margin-bottom: 20px; margin-top: 10px;
             color: #555; text-decoration: none; font-weight: bold; font-size: 14px; 

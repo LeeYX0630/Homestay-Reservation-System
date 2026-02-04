@@ -1,15 +1,10 @@
 <?php
-/**
- * =========================================================
- * Admin Manage Rooms (Final Version)
- * =========================================================
- */
 include '../includes/db_connection.php';
 include '../includes/header.php';
 
-$swalCode = ""; // 用于存 JS 弹窗代码
+$swalCode = "";
 
-// 1. 图片上传函数
+//function to handle image upload
 function uploadImage($file) {
     $target_dir = "../uploads/";
     if (!file_exists($target_dir)) { mkdir($target_dir, 0777, true); }
@@ -26,12 +21,12 @@ function uploadImage($file) {
     }
     return false;
 }
+    
+// Delete Logic 
 
-// 2. 删除逻辑 (使用 SweetAlert)
 if (isset($_GET['delete'])) {
     $id = intval($_GET['delete']);
-    
-    // 执行删除
+
     $delSql = "DELETE FROM rooms WHERE room_id='$id'";
     
     if ($conn->query($delSql) === TRUE) {
@@ -48,7 +43,7 @@ if (isset($_GET['delete'])) {
     }
 }
 
-// 3. 处理保存 (Add / Edit)
+// Save (Add/Edit) Logic 
 if (isset($_POST['save_room'])) {
     
     $id = $_POST['room_id'] ?? '';
@@ -59,13 +54,13 @@ if (isset($_POST['save_room'])) {
     $min = floatval($_POST['min_price']);
     $max = floatval($_POST['max_price']);
     
-    // ★★★ Logic Fix: 价格验证 ★★★
+    // Validation the price logic 
     if ($min < 0 || $max < 0) {
         $swalCode = "Swal.fire({ title: 'Invalid Price', text: 'Prices cannot be negative!', icon: 'error', confirmButtonColor: '#d33' });";
     } elseif ($min > $max) {
         $swalCode = "Swal.fire({ title: 'Logic Error', text: 'Min Price cannot be greater than Max Price!', icon: 'error', confirmButtonColor: '#d33' });";
     } else {
-        // 验证通过，处理图片
+
         $img_sql_part = "";
         $img_name = "";
         
@@ -121,7 +116,7 @@ if (isset($_POST['save_room'])) {
     }
 }
 
-// 4. 筛选逻辑
+// Filter Logic 
 $where_clauses = [];
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $s = $conn->real_escape_string($_GET['search']);
@@ -155,11 +150,9 @@ if (count($where_clauses) > 0) {
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
 
     <style>
-        /* CSS Styles */
         body { font-family: 'Segoe UI', Arial, sans-serif; background-color: #f4f6f9; margin: 0; padding: 0; }
         .container { max-width: 1200px; margin: 40px auto; padding: 0 20px; }
-        
-        /* ★ Back Button Style ★ */
+
         .btn-back { 
             display: inline-flex; align-items: center; margin-bottom: 20px; margin-top: 10px; 
             color: #555; text-decoration: none; font-weight: bold; font-size: 14px; 
@@ -217,7 +210,7 @@ if (count($where_clauses) > 0) {
     </style>
 
     <script>
-        // ★ Delete Confirmation ★
+        // Delete Confirmation 
         function confirmDelete(id) {
             Swal.fire({
                 title: 'Are you sure?',
