@@ -1,15 +1,15 @@
 <?php
-// for login
 
 // 1. Start Session & Buffer
 ob_start();
+// Set session to last for 24 hours
 ini_set('session.gc_maxlifetime', 86400);
 session_set_cookie_params(86400);
 
 session_start();
 require_once '../includes/db_connection.php';
 
-// 2. Redirect if already logged in
+// 2. Redirect if already logged in (Gatekeeper)
 if (isset($_SESSION['user_id'])) {
     if ($_SESSION['role'] === 'Admin') {
         header("Location: ../Module C/admin_dashboard.php");
@@ -26,7 +26,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $password = trim($_POST['password']);
     
     // Fetch user info based on email
-    $stmt = $conn->prepare("SELECT user_id, full_name, password, role FROM users WHERE email = ?");
+    $stmt = $conn->prepare("SELECT user_id, full_name, password, role, status, profile_image FROM users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -34,40 +34,51 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($result->num_rows === 1) {
         $row = $result->fetch_assoc();
 
-        // if admin tries to login here, block it
+        // 3. Admin Interceptor 
         if ($row['role'] === 'Admin') {
-            // Error message pointing to the correct page
             $error = "<strong>Admin Access Denied</strong><br>Admins must login via the <a href='admin_login.php' class='alert-link'>Admin Portal</a>.";
-        } 
-        // Only allow Customer role to login here
-        else {
+        } else {
+            // 4. Password Verification
             if (password_verify($password, $row['password'])) {
-                // Login Success   
-                unset($_SESSION['admin_id']);
-                unset($_SESSION['username']);
-
-                $_SESSION['user_id'] = $row['user_id'];
-                $_SESSION['user_name'] = $row['full_name'];
-                $_SESSION['role'] = 'Customer'; 
-
-                // Remember Me Logic
-                if (isset($_POST["remember"])) {
-                    setcookie("remember_email", $email, time() + (86400 * 30), "/");
+                
+                // 5. Block Check 
+                if ($row['status'] === 'Blocked') {
+                    $error = "⛔ Your account has been suspended.<br>Please contact admin for assistance.";
                 } else {
-                    if (isset($_COOKIE["remember_email"])) {
-                        setcookie("remember_email", "", time() - 3600, "/");
-                    }
-                }
 
-                // Redirect straight to User Dashboard
-                header("Location: user_dashboard.php");
-                exit();
+                    // LOGIN SUCCESS
+                    session_regenerate_id(true);
+
+                    $_SESSION['user_id'] = $row['user_id'];
+                    $_SESSION['user_name'] = $row['full_name'];
+                    $_SESSION['role'] = $row['role'];
+                    $_SESSION['profile_image'] = !empty($row['profile_image']) ? $row['profile_image'] : 'default.png';
+
+                    // Remember Me Logic
+                    if (isset($_POST['remember'])) {
+                        // Set Cookie for 30 days
+                        setcookie('remember_email', $email, time() + (86400 * 30), "/");
+                    } else {
+                        // Clear Cookie
+                        if (isset($_COOKIE['remember_email'])) {
+                            setcookie('remember_email', '', time() - 3600, "/");
+                        }
+                    }
+
+                    // Redirect based on role (Double Check)
+                    if ($row['role'] === 'Admin') {
+                        header("Location: ../Module C/admin_dashboard.php");
+                    } else {
+                        header("Location: user_dashboard.php");
+                    }
+                    exit();
+                }
             } else {
                 $error = "Invalid Password.";
             }
         }
     } else {
-        $error = "User not found.";
+        $error = "User not found or Invalid Credentials.";
     }
     $stmt->close();
 }
@@ -87,7 +98,8 @@ include_once '../includes/header.php';
                     
                     <div class="text-center mb-5">
                         <h2 class="fw-bold text-dark display-6">Welcome Back!</h2>
-                        <p class="text-muted">Customer Login Portal</p> </div>
+                        <p class="text-muted">Customer Login Portal</p> 
+                    </div>
                     
                     <?php if($error): ?>
                         <div class="alert alert-danger text-center rounded-3 py-3 mb-4">
