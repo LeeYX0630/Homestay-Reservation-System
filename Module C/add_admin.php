@@ -10,6 +10,7 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'superadmin') {
 }
 
 $msg = "";
+$sweetAlertCode = ""; 
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $username = trim($_POST['username']);
@@ -28,7 +29,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $msg = "<div class='alert error'>All fields are required.</div>";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $msg = "<div class='alert error'>Invalid email format.</div>";
-    } 
+    }
+    // ★【修改 1】后端强制验证域名后缀 ★
+    elseif (substr($email, -13) !== '@homestay.com') {
+        $msg = "<div class='alert error'>Restricted Domain: Admin email must end with <b>@homestay.com</b></div>";
+    }
     elseif (!preg_match('/^[0-9]{9,11}$/', $phone)) {
         $msg = "<div class='alert error'>Invalid phone number (9-11 digits required).</div>";
     }
@@ -37,6 +42,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } elseif ($password !== $confirm_password) {
         $msg = "<div class='alert error'>Passwords do not match.</div>";
     } else {
+        // 2. 查重
         $check_sql = "SELECT admin_id FROM admins WHERE username = ? OR email = ?";
         $stmt = $conn->prepare($check_sql);
         $stmt->bind_param("ss", $username, $email);
@@ -46,15 +52,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($stmt->num_rows > 0) {
             $msg = "<div class='alert error'>Username or Email already taken.</div>";
         } else {
+            // 3. 插入
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
+            $stmt->close(); 
 
             $insert_sql = "INSERT INTO admins (username, email, phone, password, full_name, role) VALUES (?, ?, ?, ?, ?, ?)";
             $stmt = $conn->prepare($insert_sql);
-            
             $stmt->bind_param("ssssss", $username, $email, $phone, $hashed_password, $full_name, $role);
 
             if ($stmt->execute()) {
-                $msg = "<div class='alert success'>New Admin ($username) added successfully!</div>";
+                // 设置 JS 代码，稍后在 HTML 里输出
+                $sweetAlertCode = "
+                Swal.fire({
+                    title: 'Admin Added!',
+                    text: 'New Admin ($username) created successfully.',
+                    icon: 'success',
+                    confirmButtonColor: '#28a745',
+                    confirmButtonText: 'Back to Dashboard'
+                }).then((result) => {
+                    if (result.isConfirmed) {
+                        window.location.href = 'admin_dashboard.php';
+                    }
+                });";
             } else {
                 $msg = "<div class='alert error'>Error: " . $conn->error . "</div>";
             }
@@ -70,6 +89,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta charset="UTF-8">
     <title>Add New Admin</title>
     <link rel="stylesheet" href="../Module A/style.css"> 
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body { background-color: #f4f4f4; font-family: 'Segoe UI', sans-serif; }
         .form-container { max-width: 500px; margin: 50px auto; padding: 40px; background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
@@ -115,10 +135,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         <div class="form-group">
             <label>Email Address (For Login)</label>
-            <input type="email" name="email" required placeholder="admin@homestay.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+            <input type="email" name="email" id="emailInput" required placeholder="username@homestay.com" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+            <small style="color:#666; font-size:0.8em;">* Must end with @homestay.com</small>
         </div>
 
-<div class="form-group">
+        <div class="form-group">
             <label>Phone Number</label>
             <input type="tel" name="phone" id="phoneInput" required placeholder="e.g. 012-3456789" 
                    maxlength="12" 
@@ -148,21 +169,27 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </div>
 
 <script>
-    // --- 自动格式化电话号码 (012-3456789) ---
-    const phoneInput = document.getElementById('phoneInput');
+    // --- ★【修改 3】Email 自动补全逻辑 ★ ---
+    const emailInput = document.getElementById('emailInput');
+    
+    emailInput.addEventListener('input', function(e) {
+        // 如果用户输入的最后一个字符是 '@'
+        if (e.target.value.endsWith('@')) {
+            // 自动补全后缀
+            e.target.value += 'homestay.com';
+        }
+    });
 
+    // --- 自动格式化电话号码 ---
+    const phoneInput = document.getElementById('phoneInput');
     phoneInput.addEventListener('input', function(e) {
         let value = e.target.value.replace(/\D/g, '');
-        
         if (value.length > 11) value = value.slice(0, 11);
-
-        if (value.length > 3) {
-            value = value.slice(0, 3) + '-' + value.slice(3);
-        }
-
+        if (value.length > 3) value = value.slice(0, 3) + '-' + value.slice(3);
         e.target.value = value;
     });
 
+    // --- 密码强度 ---
     const passwordInput = document.getElementById('passwordInput');
     const strengthBar = document.getElementById('strengthBar');
     const strengthText = document.getElementById('strengthText');
@@ -170,7 +197,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     passwordInput.addEventListener('input', function() {
         const val = passwordInput.value;
         let score = 0;
-
         if (val.length >= 6) score += 1;
         if (val.length >= 10) score += 1;
         if (/[A-Z]/.test(val)) score += 1;
@@ -204,6 +230,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             strengthText.style.color = '#28a745';
         }
     });
+
+    <?php if (!empty($sweetAlertCode)) { echo $sweetAlertCode; } ?>
 </script>
 
 </body>

@@ -252,9 +252,15 @@ $chartUrl = "https://quickchart.io/chart?c=" . rawurlencode(json_encode($chartCo
             </div>
           <?php endif; ?>
 
+            
+
           <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
             <h1 class="h2">Dashboard Overview</h1>
-            <div class="btn-toolbar mb-2 mb-md-0">
+<div class="btn-toolbar mb-2 mb-md-0">
+               <a href="admin_generate_report.php" target="_blank" class="btn btn-sm btn-danger me-2">
+                   <i class="bi bi-file-earmark-pdf-fill me-1"></i> Export Report
+               </a>
+
                <a href="../index.php" target="_blank" class="btn btn-sm btn-outline-secondary">
                    <i class="bi bi-box-arrow-up-right me-1"></i> View Live Site
                </a>
