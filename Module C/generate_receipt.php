@@ -27,6 +27,20 @@ $d1 = new DateTime($data['check_in_date']);
 $d2 = new DateTime($data['check_out_date']);
 $diff = $d1->diff($d2);
 $days = $diff->days;
+if($days == 0) $days = 1;
+
+// ★★★ 新增：动态状态逻辑 ★★★
+$status_badge = "";
+if ($data['booking_status'] == 'confirmed') {
+    // 绿色 PAID
+    $status_badge = '<span class="badge" style="background:#27ae60;">PAID</span>';
+} elseif ($data['booking_status'] == 'cancelled') {
+    // 红色 CANCELLED
+    $status_badge = '<span class="badge" style="background:#c0392b;">CANCELLED</span>';
+} else {
+    // 灰色 其他状态
+    $status_badge = '<span class="badge" style="background:#7f8c8d;">'.strtoupper($data['booking_status']).'</span>';
+}
 ?>
 
 <!DOCTYPE html>
@@ -40,36 +54,55 @@ $days = $diff->days;
         
         #receipt-box {
             background: white;
-            width: 180mm; /* A4 宽度稍小一点 */
+            width: 180mm; 
             min-height: 200mm;
             padding: 20mm;
             box-shadow: 0 0 15px rgba(0,0,0,0.3);
+            position: relative;
         }
 
-        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
+        /* 如果是取消状态，给整个收据加个水印 (可选) */
+        <?php if($data['booking_status'] == 'cancelled'): ?>
+        #receipt-box::after {
+            content: "CANCELLED";
+            position: absolute;
+            top: 40%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 100px;
+            color: rgba(192, 57, 43, 0.1);
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 0;
+        }
+        <?php endif; ?>
+
+        .header { display: flex; justify-content: space-between; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; position: relative; z-index: 1; }
         .brand h1 { margin: 0; color: #d35400; font-size: 28px; }
         .brand p { margin: 5px 0 0; font-size: 12px; color: #666; }
         
         .invoice-details { text-align: right; }
         .invoice-details h2 { margin: 0; color: #333; }
-        .badge { background: #27ae60; color: white; padding: 4px 8px; border-radius: 4px; font-size: 12px; vertical-align: middle; }
+        
+        /* Badge 样式 */
+        .badge { color: white; padding: 5px 10px; border-radius: 4px; font-size: 14px; vertical-align: middle; display: inline-block; margin-top:5px; font-weight: bold;}
 
-        .info-section { display: flex; justify-content: space-between; margin-bottom: 40px; }
+        .info-section { display: flex; justify-content: space-between; margin-bottom: 40px; position: relative; z-index: 1;}
         .info-col h4 { border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 10px; color: #555; }
         .info-col p { margin: 3px 0; font-size: 14px; color: #333; }
 
-        .table-box { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+        .table-box { width: 100%; border-collapse: collapse; margin-bottom: 30px; position: relative; z-index: 1;}
         .table-box th { background: #f8f9fa; text-align: left; padding: 12px; border-bottom: 2px solid #ddd; }
         .table-box td { padding: 12px; border-bottom: 1px solid #eee; }
         .total-row td { font-weight: bold; font-size: 18px; border-top: 2px solid #333; color: #d35400; }
 
-        .footer { text-align: center; margin-top: 50px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; }
+        .footer { text-align: center; margin-top: 50px; font-size: 12px; color: #999; border-top: 1px solid #eee; padding-top: 20px; position: relative; z-index: 1;}
         
         .btn-download {
             position: fixed; top: 20px; right: 20px;
             background: #d35400; color: white; padding: 15px 30px;
             border: none; border-radius: 5px; cursor: pointer; font-weight: bold;
             box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            z-index: 999;
         }
         .btn-download:hover { background: #e67e22; }
     </style>
@@ -89,7 +122,8 @@ $days = $diff->days;
                 <h2>RECEIPT</h2>
                 <p>Booking ID: <strong>#<?php echo $bid; ?></strong></p>
                 <p>Date: <?php echo date("d M Y"); ?></p>
-                <span class="badge">PAID</span>
+                
+                <?php echo $status_badge; ?>
             </div>
         </div>
 
@@ -135,7 +169,11 @@ $days = $diff->days;
         </table>
 
         <div class="footer">
-            <p>Thank you for choosing Teh Tarik No Tarik Homestay!</p>
+            <?php if($data['booking_status'] == 'cancelled'): ?>
+                <p style="color:#c0392b; font-weight:bold;">NOTE: This booking has been cancelled.</p>
+            <?php else: ?>
+                <p>Thank you for choosing Teh Tarik No Tarik Homestay!</p>
+            <?php endif; ?>
             <p>This is a computer-generated receipt. No signature is required.</p>
         </div>
     </div>
