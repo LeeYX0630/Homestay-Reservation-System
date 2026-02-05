@@ -3,11 +3,10 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// --- 1. 获取参数 (room_id 或 category_id) ---
+// --- 1. 获取参数 ---
 $room_id = isset($_GET['room_id']) ? intval($_GET['room_id']) : 0;
 $category_id = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
 
-// 【关键修复】如果只有 category_id，通过它找到对应的 room_id
 if ($room_id == 0 && $category_id > 0) {
     $cat_sql = "SELECT room_id FROM categories WHERE category_id = '$category_id'";
     $cat_res = $conn->query($cat_sql);
@@ -25,7 +24,6 @@ if (isset($_SESSION['admin_id'])) {
 
 // --- 登录检查 ---
 if (!isset($_SESSION['user_id'])) {
-    // 构造正确的回跳 URL (保留 category_id)
     $params = ($category_id > 0) ? "?category_id=$category_id" : "?room_id=$room_id";
     $return_url = urlencode("../Module C/check_availability.php" . $params);
     echo "<script>alert('Please login first!'); window.location.href='../Module A/login.php?redirect=$return_url';</script>";
@@ -38,44 +36,56 @@ $max_guests = 4;
 $display_price = 0;
 $display_name = "";
 
-// --- 2. 获取数据与价格逻辑 ---
+// --- 2. 获取数据 ---
 if ($room_id) {
     $sql = "SELECT * FROM rooms WHERE room_id = $room_id";
     $result = $conn->query($sql);
     if ($result->num_rows > 0) {
         $room_details = $result->fetch_assoc();
-        
-        // 默认显示房间的基础信息
         $display_name = $room_details['room_name'];
-        $display_price = $room_details['price_per_night']; // 默认 fallback
+        $display_price = $room_details['price_per_night']; 
         $max_guests = isset($room_details['capacity']) ? $room_details['capacity'] : 4;
 
-        // ★ 如果选了特定房型 (Category)，覆盖显示特定价格和人数 ★
         if ($category_id > 0) {
             $c_sql = "SELECT * FROM categories WHERE category_id = '$category_id'";
             $c_res = $conn->query($c_sql);
             if ($c_res->num_rows > 0) {
                 $cat_data = $c_res->fetch_assoc();
                 $display_name = $room_details['room_name'] . " (" . $cat_data['category_name'] . ")";
-                $display_price = $cat_data['price_per_night']; // 使用分类价格
+                $display_price = $cat_data['price_per_night']; 
                 $max_guests = $cat_data['max_pax'];
             }
         }
     }
 }
 
-// --- 3. 处理提交 ---
+// --- 3. 处理提交 (后端验证) ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $room_id = intval($_POST['room_id']); 
-    // 获取隐藏的 category_id
     $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : 0;
     
     $check_in = $_POST['check_in'];
     $check_out = $_POST['check_out'];
     $guests = $_POST['guests'];
     
+    // ★★★ 新增：后端日期验证 ★★★
+    $d1 = new DateTime($check_in);
+    $d2 = new DateTime($check_out);
+    $interval = $d1->diff($d2);
+    $days = $interval->days;
+    
+    // 计算一年后的日期
+    $one_year_later = new DateTime();
+    $one_year_later->modify('+1 year');
+
     if (empty($check_in) || empty($check_out)) {
          $msg = "<div class='alert error'>Please select dates from the calendar.</div>";
+    } elseif ($days > 20) {
+         // 限制 1：不能超过 20 晚
+         $msg = "<div class='alert error'>Maximum booking duration is 20 nights.</div>";
+    } elseif ($d2 > $one_year_later) {
+         // 限制 2：不能预订超过 1 年后的
+         $msg = "<div class='alert error'>Bookings can only be made up to 1 year in advance.</div>";
     } else {
         // 检查房间占用
         $check_sql = "SELECT * FROM bookings 
@@ -101,7 +111,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 }
             }
 
-            // 跳转时带上 category_id，以便下一步计算正确价格
             $next_url = "checkout_payment.php?room_id=$room_id&category_id=$category_id&check_in=$check_in&check_out=$check_out&guests=$guests";
 
             if ($user_conflict) {
@@ -122,6 +131,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <title>Select Dates</title>
     <link rel="stylesheet" href="../css/style.css">
     <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js'></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <style>
         body { font-family: 'Segoe UI', sans-serif; background-color: #f8f9fa; }
         .container-flex { display: flex; flex-wrap: wrap; max-width: 1000px; margin: 40px auto; gap: 20px; padding: 0 20px; }
@@ -143,15 +153,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         .progressbar li:before { content: counter(step); counter-increment: step; width: 30px; height: 30px; line-height: 28px; border: 2px solid #e0e0e0; background: #fff; display: block; text-align: center; margin: 0 auto 10px auto; border-radius: 50%; color: #ccc; font-weight: bold; z-index: 2; position: relative; }
         .progressbar li:after { content: ''; position: absolute; width: 100%; height: 3px; background: #e0e0e0; top: 15px; left: -50%; z-index: 0; }
         .progressbar li:first-child:after { content: none; }
-        
-        /* Active State (当前步骤) */
         .progressbar li.active { color: #333; }
         .progressbar li.active:before { border-color: #28a745; background: #fff; color: #28a745; box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1); }
-        
-        /* Completed State (已完成) */
         .progressbar li.completed { color: #28a745; }
         .progressbar li.completed:before { content: '✔'; border-color: #28a745; background: #28a745; color: #fff; }
-        .progressbar li.completed + li:after { background: #28a745; } /* 绿线连接 */
+        .progressbar li.completed + li:after { background: #28a745; }
     </style>
 </head>
 <body>
@@ -210,7 +216,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </div>
 
                 <p style="font-size:13px; color:#666;">
-                    <i class="bi bi-info-circle"></i> Drag on the calendar to select dates.
+                    <i class="bi bi-info-circle"></i> Max stay duration: 20 nights.<br>
+                    <i class="bi bi-calendar-range"></i> Booking window: Up to 1 year.
                 </p>
 
                 <button type="submit" class="btn-book" id="bookBtn" disabled>Proceed to Checkout</button>
@@ -229,12 +236,42 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         var checkOutInput = document.getElementById('check_out');
         var bookBtn = document.getElementById('bookBtn');
 
+        // ★ 计算今天和一年后的日期 ★
+        var today = new Date();
+        var oneYearLater = new Date();
+        oneYearLater.setFullYear(today.getFullYear() + 1);
+        
+        var validStart = today.toISOString().split('T')[0];
+        var validEnd = oneYearLater.toISOString().split('T')[0];
+
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             selectable: true, 
-            validRange: { start: '<?php echo date("Y-m-d"); ?>' },
+            // ★ 限制日历只能翻到一年后 ★
+            validRange: { 
+                start: validStart, 
+                end: validEnd 
+            },
             events: 'api_get_bookings.php?room_id=<?php echo $room_id; ?>',
+            
             select: function(info) {
+                // ★ JS 检查：不能超过 20 晚 ★
+                var start = info.start;
+                var end = info.end;
+                var diffTime = Math.abs(end - start);
+                var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+
+                if (diffDays > 20) {
+                    Swal.fire({
+                        title: 'Limit Exceeded',
+                        text: 'You can only book up to 20 nights per stay.',
+                        icon: 'warning',
+                        confirmButtonColor: '#28a745'
+                    });
+                    calendar.unselect(); // 取消选中
+                    return;
+                }
+
                 checkInInput.value = info.startStr;
                 checkOutInput.value = info.endStr;
                 bookBtn.disabled = false;
