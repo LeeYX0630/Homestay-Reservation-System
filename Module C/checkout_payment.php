@@ -368,10 +368,45 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
     document.getElementById('cardExpiry').addEventListener('input', function (e) {
         let value = e.target.value.replace(/\D/g, '');
+        
+        // Limit input to 4 digits (MMYY)
+        value = value.substring(0, 4);
+        
+        // Validate month (MM) - should not exceed 12
+        if (value.length >= 2) {
+            let month = value.substring(0, 2);
+            let monthNum = parseInt(month);
+            if (monthNum > 12 || monthNum === 0) {
+                month = month.substring(0, 1);
+                value = month + value.substring(2);
+            }
+        }
+        
+        // Format as MM/YY
         if (value.length > 2) {
             value = value.substring(0, 2) + '/' + value.substring(2, 4);
         }
         e.target.value = value;
+    });
+    
+    // Validate card expiry on blur (check if expiry date is in the future)
+    document.getElementById('cardExpiry').addEventListener('blur', function (e) {
+        let value = e.target.value;
+        if (value.length === 5 && value.includes('/')) {
+            let parts = value.split('/');
+            let month = parseInt(parts[0]);
+            let year = parseInt(parts[1]);
+            
+            const currentDate = new Date();
+            const currentYear = currentDate.getFullYear() % 100; // Get last 2 digits of year
+            const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-11
+            
+            // Check if year is in the future or same year
+            if (year < currentYear || (year === currentYear && month < currentMonth)) {
+                alert('Card has expired. Please enter a valid expiry date.');
+                e.target.value = '';
+            }
+        }
     });
 
     document.getElementById('cardCvv').addEventListener('input', function (e) {
