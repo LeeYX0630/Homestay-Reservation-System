@@ -5,11 +5,14 @@ require_once '../includes/db_connection.php';
 
 // --- 1. 基础验证与数据获取 ---
 $room_id = isset($_GET['room_id']) ? intval($_GET['room_id']) : 0;
+$category_id = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
+
 $check_in = isset($_GET['check_in']) ? $_GET['check_in'] : '';
 $check_out = isset($_GET['check_out']) ? $_GET['check_out'] : '';
 
-if ($room_id == 0 || empty($check_in) || empty($check_out)) {
-    header("Location: ../index.php");
+if ($room_id == 0 || $category_id == 0 || empty($check_in) || empty($check_out)) {
+    // 如果缺少关键参数，跳回目录
+    header("Location: ../Module B/room_catalogue.php");
     exit();
 }
 
@@ -19,29 +22,45 @@ if (!isset($_SESSION['user_id'])) {
 }
 $user_id = $_SESSION['user_id'];
 
-// 获取房间信息
-$sql_room = "SELECT * FROM rooms WHERE room_id = $room_id";
-$result_room = $conn->query($sql_room);
-if ($result_room->num_rows == 0) die("Room not found.");
-$room = $result_room->fetch_assoc();
+// ★★★ 核心修改：分别查询两张表 ★★★
 
-// 计算天数
+// 1. 从 ROOMS 表获取房间名字 (Room Name)
+$sql_room = "SELECT room_name FROM rooms WHERE room_id = '$room_id'";
+$res_room = $conn->query($sql_room);
+if ($res_room->num_rows == 0) die("Room not found.");
+$room_data = $res_room->fetch_assoc();
+$room_name_base = $room_data['room_name']; // 比如 "Happy Family Suite"
+
+// 2. 从 CATEGORIES 表获取价格 (Price) 和 类型 (Type)
+$sql_cat = "SELECT category_name, price_per_night FROM categories WHERE category_id = '$category_id'";
+$res_cat = $conn->query($sql_cat);
+if ($res_cat->num_rows == 0) die("Room category not found.");
+$cat_data = $res_cat->fetch_assoc();
+
+// ★ 强制使用 categories 表的价格 ★
+$price_per_night = floatval($cat_data['price_per_night']); 
+$category_type = $cat_data['category_name']; // 比如 "Deluxe Ocean View"
+
+// 组合显示名称
+$display_room_name = "$room_name_base ($category_type)";
+
+
+// --- 计算天数和总价 ---
 $date1 = new DateTime($check_in);
 $date2 = new DateTime($check_out);
 $interval = $date1->diff($date2);
 $days = $interval->days == 0 ? 1 : $interval->days;
 
-// 使用 rooms 表里的 price_per_night 字段
-$price_per_night = floatval($room['price_per_night']); 
 $original_total = $price_per_night * $days;
 
-// 初始化变量
+
+// --- 下面是优惠券和支付逻辑 (保持不变) ---
 $discount_amount = 0;
 $final_total = $original_total;
 $coupon_msg = "";
 $applied_coupon_code = ""; 
 
-// --- 2. 优惠券逻辑 ---
+// 2. 优惠券逻辑
 $my_coupons = []; 
 $best_coupon_code = "";
 $max_potential_discount = 0;
@@ -75,7 +94,7 @@ if ($res_coupons->num_rows > 0) {
     }
 }
 
-// --- 3. 应用优惠券 ---
+// 3. 应用优惠券
 if (($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['apply_coupon'])) || (isset($_GET['auto_best']) && $_GET['auto_best'] == 1)) {
     
     if (isset($_GET['auto_best']) && $_GET['auto_best'] == 1 && !empty($best_coupon_code)) {
@@ -113,7 +132,7 @@ if (($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['apply_coupon'])) || (
     }
 }
 
-// --- 4. 确认支付 ---
+// 4. 确认支付
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     $final_code = trim($_POST['applied_code_hidden']);
     $final_pay_amount = $original_total;
@@ -135,11 +154,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         }
     }
 
+    // 插入 Booking
     $sql_insert = "INSERT INTO bookings (user_id, room_id, check_in_date, check_out_date, total_price, booking_status, payment_status) 
                    VALUES ('$user_id', '$room_id', '$check_in', '$check_out', '$final_pay_amount', 'confirmed', 'paid')";
 
     if ($conn->query($sql_insert) === TRUE) {
-        // 获取刚生成的订单 ID
         $new_booking_id = $conn->insert_id;
 
         if ($coupon_id_to_update > 0) {
@@ -148,7 +167,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         
         $paid_amount = number_format($final_pay_amount, 2);
         
-        // 跳转到 payment_success.php
         echo "
         <!DOCTYPE html>
         <html>
@@ -171,7 +189,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     } else {
         $msg = "<div class='alert error'>Error: " . $conn->error . "</div>";
     }
-} // ★★★ 之前这里少了这一行大括号，导致报错！ ★★★
+} 
 ?>
 
 <!DOCTYPE html>
@@ -238,7 +256,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         <h4 class="fw-bold mb-4">Summary</h4>
         <div class="mb-3">
             <small class="text-muted d-block">Room Type</small>
-            <strong><?php echo htmlspecialchars($room['room_name']); ?></strong>
+            <strong><?php echo htmlspecialchars($display_room_name); ?></strong>
         </div>
         <div class="mb-3">
             <small class="text-muted d-block">Dates</small>
@@ -280,7 +298,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
             <span><i class="bi bi-ticket-perforated me-2"></i>My Vouchers</span>
             
             <?php if (!empty($best_coupon_code) && $applied_coupon_code !== $best_coupon_code && $max_potential_discount > 0): ?>
-                <a href="?room_id=<?php echo $room_id; ?>&check_in=<?php echo $check_in; ?>&check_out=<?php echo $check_out; ?>&auto_best=1" 
+                <a href="?room_id=<?php echo $room_id; ?>&category_id=<?php echo $category_id; ?>&check_in=<?php echo $check_in; ?>&check_out=<?php echo $check_out; ?>&auto_best=1" 
                    class="btn btn-sm btn-warning fw-bold btn-smart shadow-sm">
                    <i class="bi bi-lightning-charge-fill"></i> Auto-Apply Best (-RM<?php echo intval($max_potential_discount); ?>)
                 </a>
@@ -314,7 +332,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
                 </button>
                 
                 <?php if ($discount_amount > 0): ?>
-                     <a href="?room_id=<?php echo $room_id; ?>&check_in=<?php echo $check_in; ?>&check_out=<?php echo $check_out; ?>" class="btn btn-outline-secondary">Remove</a>
+                     <a href="?room_id=<?php echo $room_id; ?>&category_id=<?php echo $category_id; ?>&check_in=<?php echo $check_in; ?>&check_out=<?php echo $check_out; ?>" class="btn btn-outline-secondary">Remove</a>
                 <?php endif; ?>
             </div>
             
@@ -368,43 +386,28 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
 
     document.getElementById('cardExpiry').addEventListener('input', function (e) {
         let value = e.target.value.replace(/\D/g, '');
-        
-        // Limit input to 4 digits (MMYY)
         value = value.substring(0, 4);
-        
-        // Validate month (MM) - should not exceed 12
         if (value.length >= 2) {
-            let month = value.substring(0, 2);
-            let monthNum = parseInt(month);
-            if (monthNum > 12 || monthNum === 0) {
-                month = month.substring(0, 1);
-                value = month + value.substring(2);
-            }
+            let month = parseInt(value.substring(0, 2));
+            if (month > 12 || month === 0) value = value.substring(0, 1) + value.substring(2);
         }
-        
-        // Format as MM/YY
         if (value.length > 2) {
             value = value.substring(0, 2) + '/' + value.substring(2, 4);
         }
         e.target.value = value;
     });
     
-    // Validate card expiry on blur (check if expiry date is in the future)
     document.getElementById('cardExpiry').addEventListener('blur', function (e) {
         let value = e.target.value;
         if (value.length === 5 && value.includes('/')) {
             let parts = value.split('/');
             let month = parseInt(parts[0]);
             let year = parseInt(parts[1]);
-            
-            const currentDate = new Date();
-            const currentYear = currentDate.getFullYear() % 100; // Get last 2 digits of year
-            const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-11
-            
-            // Check if year is in the future or same year
-            if (year < currentYear || (year === currentYear && month < currentMonth)) {
-                alert('Card has expired. Please enter a valid expiry date.');
-                e.target.value = '';
+            const now = new Date();
+            const curY = now.getFullYear() % 100;
+            const curM = now.getMonth() + 1;
+            if (year < curY || (year === curY && month < curM)) {
+                alert('Card has expired.'); e.target.value = '';
             }
         }
     });

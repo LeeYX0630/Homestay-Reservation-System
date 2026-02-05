@@ -359,7 +359,7 @@ include 'includes/header.php';
                         <h3>'.$row['room_name'].'</h3>
                         <p class="price">'.$price_display.' <span style="font-size: 0.7em; color: #999;">/ night</span></p>
                         <p style="color:#666; font-size:0.9em;">'.substr($row['description'], 0, 80).'...</p>
-                        <a href="Module C/check_availability.php?room_id='.$row['room_id'].'" class="btn-details">View Details</a>
+                        <a href="Module B/room_details.php?room_id='.$row['room_id'].'" class="btn-details">View Details</a>
                     </div>
                 </div>
                 ';
