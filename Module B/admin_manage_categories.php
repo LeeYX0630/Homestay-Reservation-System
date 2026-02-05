@@ -297,7 +297,7 @@ if (count($where_clauses) > 0) {
 
 <div class="container">
     
-    <a href="admin_dashboard.php" class="btn-back">&larr; Back to Dashboard</a>
+    <a href="../Module C/admin_dashboard.php" class="btn-back">&larr; Back to Dashboard</a>
 
     <h2>Manage Homestays & Categories</h2>
 
