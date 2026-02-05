@@ -6,7 +6,6 @@ require_once '../includes/db_connection.php';
 // --- 1. 基础验证与数据获取 ---
 $room_id = isset($_GET['room_id']) ? intval($_GET['room_id']) : 0;
 $category_id = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
-$days = $interval->days == 0 ? 1 : $interval->days;
 
 $check_in = isset($_GET['check_in']) ? $_GET['check_in'] : '';
 $check_out = isset($_GET['check_out']) ? $_GET['check_out'] : '';
@@ -49,16 +48,7 @@ $display_room_name = "$room_name_base ($category_type)";
 $one_year_limit = new DateTime();
 $one_year_limit->modify('+1 year');
 
-if ($days > 20) {
-    echo "<script>alert('Error: Maximum stay duration is 20 nights.'); window.location.href='check_availability.php?room_id=$room_id&category_id=$category_id';</script>";
-    exit();
-}
 
-if ($date2 > $one_year_limit) {
-    echo "<script>alert('Error: Cannot book more than 1 year in advance.'); window.location.href='check_availability.php?room_id=$room_id&category_id=$category_id';</script>";
-    exit();
-}
-// ★★★ 检查结束 ★★★
 
 // --- 计算天数和总价 ---
 $date1 = new DateTime($check_in);

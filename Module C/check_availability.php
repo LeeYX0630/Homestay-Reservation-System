@@ -80,9 +80,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
     if (empty($check_in) || empty($check_out)) {
          $msg = "<div class='alert error'>Please select dates from the calendar.</div>";
-    } elseif ($days > 20) {
-         // 限制 1：不能超过 20 晚
-         $msg = "<div class='alert error'>Maximum booking duration is 20 nights.</div>";
+    } elseif ($days > 29) {
+         // 限制 1：不能超过 29 晚
+         $msg = "<div class='alert error'>Maximum booking duration is 29 nights.</div>";
     } elseif ($d2 > $one_year_later) {
          // 限制 2：不能预订超过 1 年后的
          $msg = "<div class='alert error'>Bookings can only be made up to 1 year in advance.</div>";
@@ -201,12 +201,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 
                 <div style="margin-bottom:15px;">
                     <label style="display:block; font-weight:bold; margin-bottom:5px;">Check-in</label>
-                    <input type="date" name="check_in" id="check_in" required readonly style="width:100%; padding:8px;">
+                    <input type="date" name="check_in" id="check_in" required min="<?php echo date('Y-m-d'); ?>" style="width:100%; padding:8px;">
                 </div>
 
                 <div style="margin-bottom:15px;">
                     <label style="display:block; font-weight:bold; margin-bottom:5px;">Check-out</label>
-                    <input type="date" name="check_out" id="check_out" required readonly style="width:100%; padding:8px;">
+                    <input type="date" name="check_out" id="check_out" required min="<?php echo date('Y-m-d'); ?>" style="width:100%; padding:8px;">
                 </div>
 
                 <div style="margin-bottom:15px;">
@@ -216,8 +216,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 </div>
 
                 <p style="font-size:13px; color:#666;">
-                    <i class="bi bi-info-circle"></i> Max stay duration: 20 nights.<br>
-                    <i class="bi bi-calendar-range"></i> Booking window: Up to 1 year.
+                    <i class="bi bi-info-circle"></i> Max stay duration: 29 nights.<br>
                 </p>
 
                 <button type="submit" class="btn-book" id="bookBtn" disabled>Proceed to Checkout</button>
@@ -236,48 +235,96 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         var checkOutInput = document.getElementById('check_out');
         var bookBtn = document.getElementById('bookBtn');
 
-        // ★ 计算今天和一年后的日期 ★
-        var today = new Date();
-        var oneYearLater = new Date();
-        oneYearLater.setFullYear(today.getFullYear() + 1);
-        
-        var validStart = today.toISOString().split('T')[0];
-        var validEnd = oneYearLater.toISOString().split('T')[0];
+        // --- 1. 定义核心验证函数 (Validater) ---
+        function validateAndUpdate() {
+            var startStr = checkInInput.value;
+            var endStr = checkOutInput.value;
 
+            if (!startStr || !endStr) {
+                bookBtn.disabled = true;
+                bookBtn.innerHTML = "Select Dates";
+                return;
+            }
+
+            var startDate = new Date(startStr);
+            var endDate = new Date(endStr);
+            var today = new Date();
+            today.setHours(0,0,0,0); // 重置时间，只比日期
+
+            // 计算差距 (毫秒 -> 天)
+            var diffTime = endDate - startDate;
+            var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            // 计算一年后
+            var oneYearLater = new Date(today);
+            oneYearLater.setFullYear(today.getFullYear() + 1);
+
+            // --- 规则检查 ---
+            if (startDate < today) {
+                alert("Check-in date cannot be in the past.");
+                checkInInput.value = "";
+                bookBtn.disabled = true;
+            } 
+            else if (endDate <= startDate) {
+                // 如果结束日期早于开始日期，不做提示，只是禁用按钮（用户可能还在输）
+                bookBtn.disabled = true;
+                bookBtn.innerHTML = "Invalid Range";
+            }
+            else if (diffDays > 29) {
+                Swal.fire({
+                    title: 'Limit Exceeded',
+                    text: 'You can only book up to 29 nights per stay.',
+                    icon: 'warning',
+                    confirmButtonColor: '#28a745'
+                });
+                checkOutInput.value = ""; // 清空结束日期
+                bookBtn.disabled = true;
+            }
+            else if (endDate > oneYearLater) {
+                Swal.fire({
+                    title: 'Too far ahead',
+                    text: 'Bookings can only be made up to 1 year in advance.',
+                    icon: 'warning',
+                    confirmButtonColor: '#28a745'
+                });
+                checkOutInput.value = "";
+                bookBtn.disabled = true;
+            }
+            else {
+                // --- 一切正常 ---
+                bookBtn.disabled = false;
+                bookBtn.innerHTML = "Book " + startStr + " to " + endStr;
+                
+                // (可选) 如果用户手动输入了日期，让日历跳转到那个月份
+                if(calendar) {
+                    calendar.gotoDate(startStr);
+                }
+            }
+        }
+
+        // --- 2. 监听输入框变化 (Manual Input) ---
+        checkInInput.addEventListener('change', validateAndUpdate);
+        checkOutInput.addEventListener('change', validateAndUpdate);
+
+        // --- 3. 初始化日历 (FullCalendar) ---
         var calendar = new FullCalendar.Calendar(calendarEl, {
             initialView: 'dayGridMonth',
             selectable: true, 
-            // ★ 限制日历只能翻到一年后 ★
-            validRange: { 
-                start: validStart, 
-                end: validEnd 
-            },
+            validRange: { start: '<?php echo date("Y-m-d"); ?>' },
             events: 'api_get_bookings.php?room_id=<?php echo $room_id; ?>',
             
+            // 当用户在日历上拖拽选择时
             select: function(info) {
-                // ★ JS 检查：不能超过 20 晚 ★
-                var start = info.start;
-                var end = info.end;
-                var diffTime = Math.abs(end - start);
-                var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-
-                if (diffDays > 20) {
-                    Swal.fire({
-                        title: 'Limit Exceeded',
-                        text: 'You can only book up to 20 nights per stay.',
-                        icon: 'warning',
-                        confirmButtonColor: '#28a745'
-                    });
-                    calendar.unselect(); // 取消选中
-                    return;
-                }
-
+                // 填充输入框
                 checkInInput.value = info.startStr;
                 checkOutInput.value = info.endStr;
-                bookBtn.disabled = false;
-                bookBtn.innerHTML = "Book " + info.startStr + " to " + info.endStr;
+                
+                // 触发验证逻辑
+                validateAndUpdate();
             },
+            
             eventDidMount: function(info) {
+                // 禁止点击已有预订背景
                 if (info.event.display === 'background') {
                     info.el.style.pointerEvents = 'none'; 
                 }
