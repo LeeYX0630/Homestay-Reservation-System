@@ -220,7 +220,7 @@ include '../includes/header.php';
                                     </td>
                                     <td class="fw-bold">RM <?php echo number_format($booking['total_price'], 2); ?></td>
                                     <td>
-                                        <span class="badge bg-success"><?php echo ucfirst($booking['booking_status']); ?></span>
+                                        <span class="badge <?php echo $booking['booking_status'] === 'cancelled' ? 'bg-danger' : 'bg-success'; ?>"><?php echo ucfirst($booking['booking_status']); ?></span>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
