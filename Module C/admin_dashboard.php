@@ -216,17 +216,26 @@ $chartUrl = "https://quickchart.io/chart?c=" . rawurlencode(json_encode($chartCo
               <span>System</span>
             </h6>
             <ul class="nav flex-column mb-2">
-              <li class="nav-item">
-                <?php if ($_SESSION['role'] === 'superadmin'): ?>
+              
+              <?php if ($_SESSION['role'] === 'superadmin'): ?>
+                  <li class="nav-item">
+                    <a class="nav-link text-success" href="admin_manage_admins.php">
+                        <i class="bi bi-person-gear me-2"></i> Manage Admins
+                    </a>
+                  </li>
+                  <li class="nav-item">
                     <a class="nav-link text-success" href="add_admin.php">
                         <i class="bi bi-person-plus-fill me-2"></i> Add New Admin
                     </a>
-                <?php else: ?>
+                  </li>
+              <?php else: ?>
+                  <li class="nav-item">
                     <a class="nav-link text-secondary" href="#" data-bs-toggle="modal" data-bs-target="#superAdminModal">
-                        <i class="bi bi-lock-fill me-2"></i> Add Admin (Locked)
+                        <i class="bi bi-lock-fill me-2"></i> Manage Admins <small>(Locked)</small>
                     </a>
-                <?php endif; ?>
-              </li>
+                  </li>
+              <?php endif; ?>
+
             </ul>
 
             <hr class="my-3">
@@ -256,7 +265,7 @@ $chartUrl = "https://quickchart.io/chart?c=" . rawurlencode(json_encode($chartCo
 
           <div class="d-flex justify-content-between flex-wrap flex-md-nowrap align-items-center pt-3 pb-2 mb-3 border-bottom">
             <h1 class="h2">Dashboard Overview</h1>
-<div class="btn-toolbar mb-2 mb-md-0">
+            <div class="btn-toolbar mb-2 mb-md-0">
                <a href="admin_generate_report.php" target="_blank" class="btn btn-sm btn-danger me-2">
                    <i class="bi bi-file-earmark-pdf-fill me-1"></i> Export Report
                </a>

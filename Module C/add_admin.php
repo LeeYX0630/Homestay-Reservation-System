@@ -5,7 +5,7 @@ require_once '../includes/db_connection.php';
 
 // --- 安全检查：只有 Super Admin 才能进这个页面 ---
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'superadmin') {
-    echo "<script>alert('Access Denied. Super Admin only.'); window.location.href='admin_dashboard.php';</script>";
+    echo "<script>alert('Access Denied. Super Admin only.'); window.location.href='admin_manage_admins.php';</script>";
     exit();
 }
 
@@ -166,7 +166,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         <button type="submit" class="btn-submit">Create Admin Account</button>
     </form>
 
-    <a href="admin_dashboard.php" class="back-link">&larr; Back to Dashboard</a>
+    <a href="admin_manage_admins.php" class="back-link">&larr; Back to Admin List</a>
 </div>
 
 <script>

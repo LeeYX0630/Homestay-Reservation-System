@@ -16,7 +16,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email']); 
     $password = trim($_POST['password']);
 
-    $stmt = $conn->prepare("SELECT admin_id, full_name, password, role, username FROM admins WHERE email = ?");
+    $stmt = $conn->prepare("SELECT admin_id, full_name, password, role, username, status FROM admins WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
@@ -26,6 +26,12 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         // Verify Password
         if (password_verify($password, $row['password'])) {
+            // Check account status before setting session
+            if (isset($row['status']) && $row['status'] === 'inactive') {
+                echo "<script>alert('Your account is deactivated. Contact Super Admin.');</script>";
+                exit();
+            }
+
             // Session Setting
             $_SESSION['admin_id'] = $row['admin_id'];
             $_SESSION['username'] = $row['username']; 
