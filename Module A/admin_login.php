@@ -28,7 +28,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if (password_verify($password, $row['password'])) {
             // Check account status before setting session
             if (isset($row['status']) && $row['status'] === 'inactive') {
-                echo "<script>alert('Your account is deactivated. Contact Super Admin.');</script>";
+                echo "<script>alert('Your account is deactivated. Contact Super Admin.'); window.location.href = 'admin_login.php';</script>";
                 exit();
             }
 
