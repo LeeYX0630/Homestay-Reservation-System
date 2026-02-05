@@ -19,30 +19,92 @@ $msg_type = "";
 
 // 3. Handle profile update
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
-    $new_name = $_POST['full_name'];
-    $new_phone = $_POST['phone'];
-    
-    $conn->query("UPDATE users SET full_name='$new_name', phone='$new_phone' WHERE user_id='$user_id'");
-    $_SESSION['user_name'] = $new_name; 
-    $msg = "Profile Updated Successfully!";
-    $msg_type = "success";
+    $new_name = $conn->real_escape_string(substr(trim($_POST['full_name']), 0, 100));
+    $phone_input = trim($_POST['phone']);
+    $new_email = strtolower(trim($_POST['email'])); // Sanitize email
 
-    if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] == 0) {
-        $target_dir = "uploads/";
-        if (!is_dir($target_dir)) mkdir($target_dir, 0777, true);
+    // --- A. PHONE VALIDATION LOGIC ---
+    $clean_phone = preg_replace('/[^0-9]/', '', $phone_input);
+    $phone_valid = false;
+    $err_details = "";
+
+    // Rule A: Starts with '60' -> Length 11-12
+    if (substr($clean_phone, 0, 2) === '60') {
+        if (strlen($clean_phone) >= 11 && strlen($clean_phone) <= 12) $phone_valid = true;
+        else $err_details = "Format 60... must be 11-12 digits.";
+    }
+    // Rule B: Starts with '01' -> Length 10-11
+    elseif (substr($clean_phone, 0, 2) === '01') {
+        if (strlen($clean_phone) >= 10 && strlen($clean_phone) <= 11) $phone_valid = true;
+        else $err_details = "Format 01... must be 10-11 digits.";
+    }
+    else {
+        $err_details = "Must start with '60' or '01'.";
+    }
+
+    // --- B. EMAIL DOMAIN VALIDATION LOGIC (ADDED) ---
+    $email_parts = explode('@', $new_email);
+    $domain = end($email_parts);
+    $domain_valid = false;
+
+    $trusted_domains = [
+        'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 
+        'icloud.com', 'live.com', 'aol.com', 'protonmail.com', 
+        'ymail.com', 'msn.com'
+    ];
+
+    if (in_array($domain, $trusted_domains)) {
+        $domain_valid = true;
+    }
+    // Check for education domains (.edu, .ac, .sch, student)
+    elseif (strpos($domain, '.edu') !== false || strpos($domain, '.ac.') !== false || strpos($domain, '.sch') !== false || strpos($domain, 'student') !== false) {
+        $domain_valid = true;
+    }
+
+    // --- C. EXECUTE CHECKS ---
+    if (!$phone_valid) {
+        $msg = "Update Failed: Invalid Malaysia Number. " . $err_details;
+        $msg_type = "danger";
+    } elseif (!$domain_valid) {
+        $msg = "Update Failed: Invalid Email Domain. Use trusted (Gmail, Yahoo) or Education emails.";
+        $msg_type = "danger";
+    } else {
+        // --- D. CHECK EMAIL UNIQUENESS ---
+        // Check if this email is used by ANOTHER user (not me)
+        $check_email = $conn->query("SELECT user_id FROM users WHERE email='$new_email' AND user_id != '$user_id'");
         
-        $filename = time() . "_" . basename($_FILES["profile_image"]["name"]);
-        $target_file = $target_dir . $filename;
-        $check = getimagesize($_FILES["profile_image"]["tmp_name"]);
-        
-        if($check !== false) {
-            if (move_uploaded_file($_FILES["profile_image"]["tmp_name"], $target_file)) {
-                $conn->query("UPDATE users SET profile_image='$filename' WHERE user_id='$user_id'");
-            } else {
-                $msg = "Error uploading file."; $msg_type = "danger";
-            }
+        if ($check_email->num_rows > 0) {
+            $msg = "Update Failed: This email is already used by another account.";
+            $msg_type = "danger";
         } else {
-            $msg = "File is not an image."; $msg_type = "danger";
+            // ALL VALID -> UPDATE DB
+            $new_phone = $clean_phone;
+            
+            $conn->query("UPDATE users SET full_name='$new_name', phone='$new_phone', email='$new_email' WHERE user_id='$user_id'");
+            
+            $_SESSION['user_name'] = $new_name; 
+            $msg = "Profile Updated Successfully!";
+            $msg_type = "success";
+
+            // Handle Image Upload
+            if (isset($_FILES['profile_image']) && $_FILES['profile_image']['error'] == 0) {
+                $target_dir = "uploads/";
+                if (!is_dir($target_dir)) mkdir($target_dir, 0777, true);
+                
+                $filename = time() . "_" . basename($_FILES["profile_image"]["name"]);
+                $target_file = $target_dir . $filename;
+                $check = getimagesize($_FILES["profile_image"]["tmp_name"]);
+                
+                if($check !== false) {
+                    if (move_uploaded_file($_FILES["profile_image"]["tmp_name"], $target_file)) {
+                        $conn->query("UPDATE users SET profile_image='$filename' WHERE user_id='$user_id'");
+                    } else {
+                        $msg = "Error uploading file."; $msg_type = "danger";
+                    }
+                } else {
+                    $msg = "File is not an image."; $msg_type = "danger";
+                }
+            }
         }
     }
 }
@@ -56,21 +118,20 @@ include '../includes/header.php';
 ?>
 
 <style>
-    /* 强制限制头像大小，防止撑爆布局 */
+    /*restrict .profile-img-large*/
     .profile-img-large {
-        width: 150px;        /* 固定宽度 */
-        height: 150px;       /* 固定高度 */
-        object-fit: cover;   /* 裁剪模式：保证图片不变形，填满圆框 */
-        border-radius: 50%;  /* 变成圆形 (如果想要方形，去掉这行) */
-        border: 4px solid #fff; /* 加个白边，更好看 */
-        box-shadow: 0 5px 15px rgba(0,0,0,0.15); /* 加点阴影 */
-        margin: 0 auto;      /* 居中 */
+        width: 150px;      
+        height: 150px;   
+        object-fit: cover;   
+        border-radius: 50%;  
+        border: 4px solid #fff; 
+        box-shadow: 0 5px 15px rgba(0,0,0,0.15); 
+        margin: 0 auto;  
         display: block;
     }
     
-    /* 让左侧卡片和右侧内容对齐更好 */
     .card {
-        overflow: hidden; /* 防止内容溢出圆角 */
+        overflow: hidden;
     }
 </style>
 
@@ -118,8 +179,24 @@ include '../includes/header.php';
                     </div>
                     <div class="col-md-6 mb-3">
                         <label class="form-label fw-bold small text-secondary">Phone Number</label>
-                        <input type="text" class="form-control bg-light border-0 py-2" name="phone" value="<?php echo $user['phone']; ?>" required>
+                        <input type="text" class="form-control bg-light border-0 py-2" 
+                               name="phone" 
+                               value="<?php echo $user['phone']; ?>" 
+                               required 
+                               maxlength="13"
+                               placeholder="e.g. 60123456789 or 0123456789"
+                               oninput="validatePhone(this)">
+                        <small class="text-muted" style="font-size: 0.8rem;">Allowed: 601... or 01...</small>
                     </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-bold small text-secondary">Email Address</label>
+                    <input type="email" class="form-control bg-light border-0 py-2" 
+                           name="email" 
+                           value="<?php echo $user['email']; ?>" 
+                           required>
+                    <small class="text-muted" style="font-size: 0.8rem;">Trusted domains only (Gmail, Yahoo, School, etc.)</small>
                 </div>
 
                 <div class="mb-4">
@@ -137,7 +214,7 @@ include '../includes/header.php';
             <h5 class="mb-3 fw-bold"><i class="bi bi-ticket-perforated me-2"></i>My Vouchers</h5>
             
             <?php
-            // 查询当前用户拥有的优惠券 (只显示 Active 的，或者你可以改成显示全部)
+            // Fetch active vouchers
             $coupon_sql = "SELECT uc.*, c.code, c.discount_value, c.discount_type, c.min_spend, c.expiry_date 
                            FROM user_coupons uc 
                            JOIN coupons c ON uc.coupon_id = c.coupon_id 
@@ -178,8 +255,6 @@ include '../includes/header.php';
                 <?php endif; ?>
             </div>
         </div>
-    </div>
-
 
         <div class="card p-4 shadow-sm border-0 rounded-4">
             <h5 class="mb-3 fw-bold">Booking History</h5>
@@ -220,7 +295,7 @@ include '../includes/header.php';
                                     </td>
                                     <td class="fw-bold">RM <?php echo number_format($booking['total_price'], 2); ?></td>
                                     <td>
-                                        <span class="badge <?php echo $booking['booking_status'] === 'cancelled' ? 'bg-danger' : 'bg-success'; ?>"><?php echo ucfirst($booking['booking_status']); ?></span>
+                                        <span class="badge bg-success"><?php echo ucfirst($booking['booking_status']); ?></span>
                                     </td>
                                 </tr>
                             <?php endwhile; ?>
@@ -245,6 +320,16 @@ include '../includes/header.php';
     }
     setInterval(updateClock, 1000);
     updateClock();
+
+    // Phone Validation Script
+    function validatePhone(input) {
+        // Remove non-numeric chars
+        input.value = input.value.replace(/[^0-9]/g, '');
+        // Safety cap at 13 chars
+        if(input.value.length > 13) {
+            input.value = input.value.slice(0, 13);
+        }
+    }
 </script>
 
 <?php 

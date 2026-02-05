@@ -1,5 +1,5 @@
 <?php
-// forgot_password.php
+// for forgot password
 session_start();
 require_once '../includes/db_connection.php';
 
@@ -9,23 +9,30 @@ $success_link = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email']);
     
-    // check email exists
-    $stmt = $conn->prepare("SELECT user_id FROM users WHERE email = ?");
+    //Fetch 'status' along with user_id
+    $stmt = $conn->prepare("SELECT user_id, status FROM users WHERE email = ?");
     $stmt->bind_param("s", $email);
     $stmt->execute();
     $result = $stmt->get_result();
 
     if ($result->num_rows > 0) {
-        $token = bin2hex(random_bytes(32));
-        
-        // let MySQL store the token and expiry time
-        $update = $conn->prepare("UPDATE users SET reset_token = ?, reset_token_expiry = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE email = ?");
-        $update->bind_param("ss", $token, $email);
-        
-        if ($update->execute()) {
-            $success_link = "reset_password.php?token=" . $token;
+        $row = $result->fetch_assoc();
+
+        //Check if user is blocked
+        if ($row['status'] === 'Blocked') {
+            $error = "⛔ Account Suspended. You cannot reset password.<br>Please contact admin.";
         } else {
-            $error = "System error. Could not generate token.";
+            // Account is Active, proceed to generate token
+            $token = bin2hex(random_bytes(32));
+            
+            $update = $conn->prepare("UPDATE users SET reset_token = ?, reset_token_expiry = DATE_ADD(NOW(), INTERVAL 1 HOUR) WHERE email = ?");
+            $update->bind_param("ss", $token, $email);
+            
+            if ($update->execute()) {
+                $success_link = "reset_password.php?token=" . $token;
+            } else {
+                $error = "System error. Could not generate token.";
+            }
         }
     } else {
         $error = "No account found with that email.";

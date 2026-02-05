@@ -1,5 +1,5 @@
 <?php
-
+// for user login
 // 1. Start Session & Buffer
 ob_start();
 // Set session to last for 24 hours
@@ -24,6 +24,7 @@ $error = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $email = trim($_POST['email']);
     $password = trim($_POST['password']);
+    
     
     // Fetch user info based on email
     $stmt = $conn->prepare("SELECT user_id, full_name, password, role, status, profile_image FROM users WHERE email = ?");

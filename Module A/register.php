@@ -1,4 +1,5 @@
 <?php
+// for register
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -51,7 +52,7 @@ if (isset($_SESSION['user_id'])) {
     </div>
 <?php
     include_once '../includes/footer.php';
-    exit(); // Stop execution here
+    exit(); 
 }
 
 // 2. REGISTRATION LOGIC: Only for guests
@@ -63,13 +64,61 @@ $success = "";
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     // Sanitize input
     $full_name = substr(trim($_POST['full_name']), 0, 100);
-    $email = substr(trim($_POST['email']), 0, 255);
-    $phone = substr(trim($_POST['phone']), 0, 12); 
+    $email = strtolower(substr(trim($_POST['email']), 0, 255)); // Convert email to lowercase
     $password = trim($_POST['password']);
     $confirm_password = trim($_POST['confirm_password']);
     
-    // Check if passwords match
-    if ($password !== $confirm_password) {
+    // --- 1. EMAIL DOMAIN VALIDATION START --- [
+    $email_parts = explode('@', $email);
+    $domain = end($email_parts); // Get the part after @
+    $domain_valid = false;
+
+    // List of trusted public email providers
+    $trusted_domains = [
+        'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 
+        'icloud.com', 'live.com', 'aol.com', 'protonmail.com', 
+        'ymail.com', 'msn.com'
+    ];
+
+    // Check 1: Is it in the trusted list?
+    if (in_array($domain, $trusted_domains)) {
+        $domain_valid = true;
+    }
+    // Check 2: Is it a school/education email? (Ends with .edu, .edu.my, .ac, .sch, etc.)
+    elseif (strpos($domain, '.edu') !== false || strpos($domain, '.ac.') !== false || strpos($domain, '.sch') !== false || strpos($domain, 'student') !== false) {
+        $domain_valid = true;
+    }
+    // --- EMAIL VALIDATION END ---
+
+
+    // --- 2. MALAYSIA PHONE VALIDATION START ---
+    $phone_input = trim($_POST['phone']);
+    $clean_phone = preg_replace('/[^0-9]/', '', $phone_input); // Remove non-digits
+    $phone_valid = false;
+
+    // Rule 1: Starts with 60 (Length 11-12)
+    if (substr($clean_phone, 0, 2) === '60') {
+        if (strlen($clean_phone) >= 11 && strlen($clean_phone) <= 12) {
+            $phone_valid = true;
+        }
+    }
+    // Rule 2: Starts with 01 (Length 10-11)
+    elseif (substr($clean_phone, 0, 2) === '01') {
+        if (strlen($clean_phone) >= 10 && strlen($clean_phone) <= 11) {
+            $phone_valid = true;
+        }
+    }
+    
+    $phone = $clean_phone; 
+    // --- PHONE VALIDATION END ---
+
+    // --- 3. EXECUTE CHECKS ---
+    if (!$domain_valid) {
+        // 
+        $error = "Registration Failed: We only accept emails from trusted providers (Gmail, Yahoo, Outlook, etc.) or Education/School domains.";
+    } elseif (!$phone_valid) {
+        $error = "Registration Failed: Strictly for Malaysian number only (e.g. 0123456789 or 60123456789).";
+    } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
     } else {
         // Check for duplicate email or phone
@@ -133,15 +182,18 @@ include_once '../includes/header.php';
                         </div>
 
                         <div class="mb-4">
-                            <label class="form-label fw-bold small text-secondary">Phone Number</label>
+                            <label class="form-label fw-bold small text-secondary">Phone Number (MY Only)</label>
                             <input type="text" name="phone" class="form-control form-control-lg bg-light border-0 py-3" 
-                                   placeholder="e.g. 0123456789" required maxlength="12">
+                                   placeholder="e.g. 0123456789 or 601..." 
+                                   required maxlength="12"
+                                   oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 12);">
+                            <small class="text-muted" style="font-size: 0.8rem;">Malaysian format only (01x... or 601...)</small>
                         </div>
 
                         <div class="mb-4">
                             <label class="form-label fw-bold small text-secondary">Email Address</label>
                             <input type="email" name="email" class="form-control form-control-lg bg-light border-0 py-3" 
-                                   required maxlength="255" placeholder="name@example.com">
+                                   required maxlength="255" placeholder="name@example.com (Gmail, Yahoo, School, etc.)">
                         </div>
 
                         <div class="mb-1"> 
@@ -149,7 +201,7 @@ include_once '../includes/header.php';
                             <input type="password" name="password" id="passwordInput" class="form-control form-control-lg bg-light border-0 py-3" required>
                         </div>
                         
-                        <div class="mb-4 d-flex align-items-center">
+                        <div class="mb-4 d-flex align-items-center flex-wrap">
                             <small class="text-muted me-2">Strength:</small> 
                             <span id="strengthText" class="fw-bold small text-muted">Enter password...</span>
                         </div>
@@ -182,31 +234,26 @@ include_once '../includes/header.php';
 
     passwordInput.addEventListener('input', function() {
         const val = passwordInput.value;
-        let strength = 0;
+        let missing = []; 
 
-        // Length Check
-        if (val.length >= 6) strength += 1;
-        if (val.length >= 10) strength += 1;
+        // 1. Check what is missing
+        if (val.length < 6) missing.push("6+ Chars");
+        if (!/[A-Z]/.test(val)) missing.push("Uppercase");
+        if (!/[0-9]/.test(val)) missing.push("Number");
+        if (!/[^A-Za-z0-9]/.test(val)) missing.push("Symbol");
 
-        // Complexity Check
-        if (/[0-9]/.test(val)) strength += 1; // Numbers
-        if (/[A-Z]/.test(val)) strength += 1; // Uppercase
-        if (/[^A-Za-z0-9]/.test(val)) strength += 1; // Symbols
-
-        // Output Status
+        // 2. Logic to display hint vs success
         if (val.length === 0) {
             strengthText.textContent = "Enter password...";
             strengthText.className = "fw-bold small text-muted";
-        } else if (val.length < 6) {
-            strengthText.textContent = "Too Short 🔴";
+        } 
+        else if (missing.length > 0) {
+            // If something is missing, list it out
+            strengthText.innerHTML = "Weak <span class='text-muted fw-normal'>(Add: " + missing.join(", ") + ")</span>";
             strengthText.className = "fw-bold small text-danger";
-        } else if (strength < 3) {
-            strengthText.textContent = "Weak 🔴";
-            strengthText.className = "fw-bold small text-danger";
-        } else if (strength === 3 || strength === 4) {
-            strengthText.textContent = "Medium 🟠";
-            strengthText.className = "fw-bold small text-warning";
-        } else {
+        } 
+        else {
+            // If nothing missing -> Strong
             strengthText.textContent = "Strong 🟢";
             strengthText.className = "fw-bold small text-success";
         }
