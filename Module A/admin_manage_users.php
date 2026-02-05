@@ -1,5 +1,5 @@
 <?php
-// admin_manage_users.php
+// for admin to manage users 
 session_start();
 require_once '../includes/db_connection.php';
 
@@ -83,7 +83,11 @@ include '../includes/header.php';
                                     </td>
 
                                     <td><?php echo htmlspecialchars($row['phone']); ?></td>
-                                    <td class="text-muted small">N/A</td> 
+                                    <td class="text-muted small">
+                                    <?php 
+                                    echo !empty($row['created_at']) ? date("d M Y", strtotime($row['created_at'])) : "Unknown"; 
+                                    ?>
+                                    </td>
                                     
                                     <td class="text-end pe-4">
                                         <?php if ($row['status'] === 'Active'): ?>

@@ -1,5 +1,5 @@
 <?php
-// Module A/logout.php
+// for user logout
 session_start();
 
 $redirect_to = "login.php"; 

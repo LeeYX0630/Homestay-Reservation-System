@@ -1,9 +1,9 @@
 <?php
-// admin/admin_login.php
+// for admin login
 session_start();
 require_once '../includes/db_connection.php';
 
-// 1. 如果已经登录，直接跳去 Dashboard
+// 1. Gatekeeper: Redirect if already logged in as Admin
 if (isset($_SESSION['role']) && ($_SESSION['role'] === 'superadmin' || $_SESSION['role'] === 'admin')) {
     header("Location: ../Module C/admin_dashboard.php");
     exit();
@@ -24,14 +24,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     if ($result->num_rows === 1) {
         $row = $result->fetch_assoc();
 
-        // 验证密码
+        // Verify Password
         if (password_verify($password, $row['password'])) {
-            // 设置 Session
+            // Session Setting
             $_SESSION['admin_id'] = $row['admin_id'];
-            $_SESSION['username'] = $row['username']; // Dashboard 依然显示用户名
-            $_SESSION['role'] = $row['role'];         // superadmin 或 admin
+            $_SESSION['username'] = $row['username']; 
+            $_SESSION['role'] = $row['role'];         
             
-            // 【修改】登录成功跳转到 Dashboard
+            // Redirect to Admin Dashboard
             header("Location: ../Module C/admin_dashboard.php");
             exit();
         } else {
@@ -44,7 +44,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 }
 
 $page_title = "Admin Login";
-// 注意 header.php 的路径
 include_once '../includes/header.php'; 
 ?>
 
