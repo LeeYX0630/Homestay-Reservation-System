@@ -1,18 +1,18 @@
 body {
-    background-color: #FFFFFF; /* 背景色: 纯白 [cite: 310] */
-    font-family: Arial, "Segoe UI", sans-serif; /* 字体: 无衬线 [cite: 309] */
+    background-color: #FFFFFF;
+    font-family: Arial, "Segoe UI", sans-serif;
     margin: 0;
     padding: 0;
 }
 
 /* 导航栏样式 */
 nav {
-    background-color: #333333; /* 主色调: 深灰 [cite: 306, 307] */
+    background-color: #333333;
     padding: 15px;
 }
 
 nav a {
-    color: #F5F5F5; /* 导航字体颜色: 浅灰/白 [cite: 308] */
+    color: #F5F5F5;
     text-decoration: none;
     margin-right: 20px;
     font-size: 16px;
@@ -22,7 +22,6 @@ nav a:hover {
     text-decoration: underline;
 }
 
-/* 标题规范 [cite: 309] */
 h1, h2 {
     color: #333333;
 }
