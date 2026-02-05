@@ -1,5 +1,5 @@
 <?php
-// for user registration
+// for register
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -62,12 +62,36 @@ $error = "";
 $success = "";
 
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
+    // Sanitize input
     $full_name = substr(trim($_POST['full_name']), 0, 100);
-    $email = substr(trim($_POST['email']), 0, 255);
+    $email = strtolower(substr(trim($_POST['email']), 0, 255)); // Convert email to lowercase
     $password = trim($_POST['password']);
     $confirm_password = trim($_POST['confirm_password']);
     
-    // --- MALAYSIA PHONE VALIDATION START ---
+    // --- 1. EMAIL DOMAIN VALIDATION START --- [
+    $email_parts = explode('@', $email);
+    $domain = end($email_parts); // Get the part after @
+    $domain_valid = false;
+
+    // List of trusted public email providers
+    $trusted_domains = [
+        'gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 
+        'icloud.com', 'live.com', 'aol.com', 'protonmail.com', 
+        'ymail.com', 'msn.com'
+    ];
+
+    // Check 1: Is it in the trusted list?
+    if (in_array($domain, $trusted_domains)) {
+        $domain_valid = true;
+    }
+    // Check 2: Is it a school/education email? (Ends with .edu, .edu.my, .ac, .sch, etc.)
+    elseif (strpos($domain, '.edu') !== false || strpos($domain, '.ac.') !== false || strpos($domain, '.sch') !== false || strpos($domain, 'student') !== false) {
+        $domain_valid = true;
+    }
+    // --- EMAIL VALIDATION END ---
+
+
+    // --- 2. MALAYSIA PHONE VALIDATION START ---
     $phone_input = trim($_POST['phone']);
     $clean_phone = preg_replace('/[^0-9]/', '', $phone_input); // Remove non-digits
     $phone_valid = false;
@@ -86,10 +110,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     }
     
     $phone = $clean_phone; 
-    // --- MALAYSIA PHONE VALIDATION END ---
+    // --- PHONE VALIDATION END ---
 
-    if (!$phone_valid) {
-        $error = "Registration Failed: strictly for Malaysian number only (e.g. 0123456789 or 60123456789).";
+    // --- 3. EXECUTE CHECKS ---
+    if (!$domain_valid) {
+        // 
+        $error = "Registration Failed: We only accept emails from trusted providers (Gmail, Yahoo, Outlook, etc.) or Education/School domains.";
+    } elseif (!$phone_valid) {
+        $error = "Registration Failed: Strictly for Malaysian number only (e.g. 0123456789 or 60123456789).";
     } elseif ($password !== $confirm_password) {
         $error = "Passwords do not match.";
     } else {
@@ -165,7 +193,7 @@ include_once '../includes/header.php';
                         <div class="mb-4">
                             <label class="form-label fw-bold small text-secondary">Email Address</label>
                             <input type="email" name="email" class="form-control form-control-lg bg-light border-0 py-3" 
-                                   required maxlength="255" placeholder="name@example.com">
+                                   required maxlength="255" placeholder="name@example.com (Gmail, Yahoo, School, etc.)">
                         </div>
 
                         <div class="mb-1"> 
