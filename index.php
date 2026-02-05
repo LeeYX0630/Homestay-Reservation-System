@@ -295,7 +295,6 @@ include 'includes/header.php';
             video.addEventListener('ended', playNextVideo);
         });
 
-        // --- 【修改 3】鼠标拖动滑动功能 (Drag to Scroll) ---
         const slider = document.querySelector('.room-grid');
         let isDown = false;
         let startX;
@@ -327,8 +326,7 @@ include 'includes/header.php';
 
 <div class="featured-container">
     <h2 class="section-title">Recommended Rooms</h2>
-    <p class="section-subtitle"><i class="bi bi-arrow-left-right"></i> Drag or scroll to see more latest homestays</p>
-    
+
     <div class="room-grid">
         <?php
         if ($result->num_rows > 0) {
