@@ -20,12 +20,10 @@ if ($is_root) {
     $path_mod_c = "../Module C/";
 }
 
-// 2. 页面与标题设置
 $current_page = basename($_SERVER['PHP_SELF']);
 $auth_pages = ['login.php', 'register.php', 'admin_login.php', 'forgot_password.php'];
 if (!isset($page_title)) $page_title = "Teh Tarik No Tarik Homestay";
 
-// 3. 用户身份识别
 $nav_is_logged_in = false;
 $nav_user_name = "";
 $nav_profile_pic = $path_mod_a . "uploads/default.png"; 
@@ -65,7 +63,6 @@ if (isset($_SESSION['user_id'])) {
       .navbar-nav .nav-link:hover { color: #fff; }
       .navbar-nav .nav-link.active { color: #fff; font-weight: 700; border-bottom: 2px solid #f0ad4e; }
       
-      /* 搜索框样式微调 */
       .search-form { width: 100%; max-width: 400px; }
       .search-input { border-radius: 20px 0 0 20px; border: none; }
       .search-btn { border-radius: 0 20px 20px 0; background-color: #f0ad4e; color: white; border: none; }
