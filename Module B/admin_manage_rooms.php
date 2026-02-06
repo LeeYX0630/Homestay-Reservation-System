@@ -1,9 +1,5 @@
 <?php
-/**
- * =========================================================
- * Admin Manage Rooms (Filter Validation: No Negative Prices)
- * =========================================================
- */
+
 include '../includes/db_connection.php';
 include '../includes/header.php';
 
@@ -259,7 +255,7 @@ if (count($where_clauses) > 0) {
             form.submit();
         }
 
-        // ★★★ Filter Validation Check ★★★
+        //  Filter Validation Check 
         function validateFilter() {
             var minInput = document.getElementById('filterMin').value;
             var maxInput = document.getElementById('filterMax').value;

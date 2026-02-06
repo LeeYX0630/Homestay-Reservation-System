@@ -23,7 +23,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_contact'])) {
         $swalCode = "Swal.fire({ title: 'Empty Message', text: 'Please enter your message', icon: 'warning', confirmButtonColor: '#333' });";
     } 
     else {
-        // --- Insert into database for contact us ---
+        // --- Insert into database for contant us---
         $clean_name = $conn->real_escape_string($name);
         $clean_email = $conn->real_escape_string($email);
         $clean_message = $conn->real_escape_string($message);
@@ -31,34 +31,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_contact'])) {
         $sql = "INSERT INTO contact_us (name, email, message) VALUES ('$clean_name', '$clean_email', '$clean_message')";
 
         if ($conn->query($sql) === TRUE) {
-            
-            // ========================================================
-            // ★★★ START: Email Notification Logic ★★★
-            // ========================================================
-            
-            // ⚠️ 记得修改这里：改成你的 Admin 邮箱地址
-            $to = "khaijun2606@gmail.com"; 
-            
-            $subject = "New Contact Message from: " . $clean_name;
-            
-            $email_content = "You have received a new message from your Homestay website.\n\n";
-            $email_content .= "Name: " . $clean_name . "\n";
-            $email_content .= "Email: " . $clean_email . "\n";
-            $email_content .= "Message:\n" . $clean_message . "\n";
-            $email_content .= "\n-----------------------------\n";
-            
-            // Header 设置 (确保 From 是合法的格式)
-            $headers = "From: noreply@homestay.com\r\n"; 
-            $headers .= "Reply-To: " . $clean_email . "\r\n";
-            $headers .= "X-Mailer: PHP/" . phpversion();
-
-            // 发送邮件 (加 @ 防止 Localhost 报错)
-            @mail($to, $subject, $email_content, $headers);
-            
-            // ========================================================
-            // ★★★ END: Email Notification Logic ★★★
-            // ========================================================
-
             // Success Alert
             $swalCode = "Swal.fire({ 
                 title: 'Submit Successfully', 
@@ -67,7 +39,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_contact'])) {
                 confirmButtonColor: '#28a745' 
             });";
 
-            // Clear form data
+            // Clear form data after successful submission
             $_POST = array(); 
             $name = "";
             $email = "";
@@ -173,22 +145,22 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['submit_contact'])) {
                 <h3>Send us a message</h3>
                 
                 <form action="" method="post">
-                    <input type="text" name="name" placeholder="Your Name" value="<?php echo isset($name) ? htmlspecialchars($name) : ''; ?>">
-                    <input type="email" name="email" placeholder="Your Email" value="<?php echo isset($email) ? htmlspecialchars($email) : ''; ?>">
-                    <textarea name="message" rows="5" placeholder="Message"><?php echo isset($message) ? htmlspecialchars($message) : ''; ?></textarea>
+                    <input type="text" name="name" placeholder="Your Name" value="<?php echo isset($_POST['name']) ? htmlspecialchars($_POST['name']) : ''; ?>">
+                    <input type="email" name="email" placeholder="Your Email" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email']) : ''; ?>">
+                    <textarea name="message" rows="5" placeholder="Message"><?php echo isset($_POST['message']) ? htmlspecialchars($_POST['message']) : ''; ?></textarea>
                     <button type="submit" name="submit_contact">Send Message</button>
                 </form>
             </div>
 
             <div class="map-container">
                 <iframe 
-                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3986.8377774900486!2d102.2403!3d2.2000!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31d1f1dd8250285d%3A0x629735d490ed4b26!2sMelaka!5e0!3m2!1sen!2smy!4v1700000000000!5m2!1sen!2smy" 
                     width="100%" 
                     height="100%" 
-                    style="border:0;" 
-                    allowfullscreen="" 
-                    loading="lazy" 
-                    referrerpolicy="no-referrer-when-downgrade">
+                    frameborder="0" 
+                    scrolling="no" 
+                    marginheight="0" 
+                    marginwidth="0" 
+                    src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d31878.68356345992!2d102.25997637841572!3d2.2743909062602755!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x31d1e56b9710cf4b%3A0x66b6b12b75469278!2sAyer%20Keroh%2C%20Melaka!5e0!3m2!1sen!2smy!4v1707123456789!5m2!1sen!2smy">
                 </iframe>
             </div>
         </section>
