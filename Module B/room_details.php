@@ -183,11 +183,11 @@ $isAdmin = (isset($_SESSION['role']) && $_SESSION['role'] === 'admin');
         .progressbar li:after { content: ''; position: absolute; width: 100%; height: 3px; background: #e0e0e0; top: 15px; left: -50%; z-index: 0; }
         .progressbar li:first-child:after { content: none; }
         
-        /* Active State (当前步骤) */
+        /* Active State  */
         .progressbar li.active { color: #333; }
         .progressbar li.active:before { border-color: #28a745; background: #fff; color: #28a745; box-shadow: 0 0 0 3px rgba(40, 167, 69, 0.1); }
         
-        /* Completed State (已完成) */
+        /* Completed State  */
         .progressbar li.completed { color: #28a745; }
         .progressbar li.completed:before { content: '✔'; border-color: #28a745; background: #28a745; color: #fff; }
         .progressbar li.completed + li:after { background: #28a745; } /* 绿线连接 */
