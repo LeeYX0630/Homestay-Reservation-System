@@ -2,14 +2,11 @@
 // admin/fix_password.php
 require_once '../includes/db_connection.php';
 
-// 1. 设置我们要重置的账号和新密码
 $target_email = 'admin@homestay.com';
 $new_password = 'admin123';
 
-// 2. 让 PHP 用当前的算法生成哈希 (这样绝对不会错)
 $new_hash = password_hash($new_password, PASSWORD_DEFAULT);
 
-// 3. 执行更新
 $sql = "UPDATE admins SET password = ? WHERE email = ?";
 $stmt = $conn->prepare($sql);
 $stmt->bind_param("ss", $new_hash, $target_email);
@@ -35,24 +32,20 @@ if ($stmt->execute()) {
 session_start();
 require_once '../includes/db_connection.php';
 
-// 初始化 SQL
 $sql = "SELECT * FROM rooms";
 $where_clauses = [];
 
-// 1. 处理搜索功能
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $search = $conn->real_escape_string($_GET['search']);
-    // 使用 LIKE 进行模糊匹配
     $where_clauses[] = "(room_name LIKE '%$search%' OR description LIKE '%$search%')";
 }
 
-// (可选) 如果你还有 category 筛选
 if (isset($_GET['category_id']) && !empty($_GET['category_id'])) {
     $cat_id = intval($_GET['category_id']);
     $where_clauses[] = "category_id = $cat_id";
 }
 
-// 拼接 SQL
+
 if (!empty($where_clauses)) {
     $sql .= " WHERE " . implode(" AND ", $where_clauses);
 }

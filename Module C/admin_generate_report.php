@@ -3,28 +3,22 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// 权限检查
 if (!isset($_SESSION['admin_id'])) {
     die("Access Denied");
 }
 
-// --- 1. 获取数据 (Data Fetching) ---
 $report_date = date("d M Y, h:i A");
 
-// 总收入
 $res_rev = $conn->query("SELECT SUM(total_price) as rev FROM bookings WHERE booking_status = 'confirmed'");
 $revenue = $res_rev->fetch_assoc()['rev'] ?? 0;
 
-// 总订单数
 $res_bk = $conn->query("SELECT COUNT(*) as total FROM bookings");
 $total_bookings = $res_bk->fetch_assoc()['total'];
 
-// 待入住
 $today = date('Y-m-d');
 $res_up = $conn->query("SELECT COUNT(*) as up FROM bookings WHERE booking_status = 'confirmed' AND check_in_date >= '$today'");
 $upcoming = $res_up->fetch_assoc()['up'];
 
-// 获取详细订单列表 (最近 50 条)
 $sql_list = "SELECT b.*, r.room_name, u.full_name, u.email 
              FROM bookings b 
              JOIN rooms r ON b.room_id = r.room_id 
@@ -43,7 +37,6 @@ $list = $conn->query($sql_list);
     <style>
         body { font-family: 'Helvetica', Arial, sans-serif; background: #555; padding: 30px; }
         
-        /* A4 纸张模拟样式 */
         #report-content {
             background: white;
             width: 210mm;
@@ -53,7 +46,6 @@ $list = $conn->query($sql_list);
             box-shadow: 0 0 10px rgba(0,0,0,0.5);
         }
 
-        /* 报告内部样式 */
         .header { text-align: center; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 30px; }
         .logo { font-size: 24px; font-weight: bold; color: #d35400; text-transform: uppercase; }
         .sub-header { color: #666; font-size: 14px; margin-top: 5px; }
@@ -70,7 +62,6 @@ $list = $conn->query($sql_list);
 
         .footer { margin-top: 50px; text-align: center; font-size: 10px; color: #999; border-top: 1px solid #eee; padding-top: 10px; }
         
-        /* 隐藏生成时的加载字样 */
         .loading { color: white; text-align: center; font-size: 20px; margin-bottom: 20px; }
     </style>
 </head>
@@ -144,16 +135,14 @@ $list = $conn->query($sql_list);
         window.onload = function() {
             const element = document.getElementById('report-content');
             const opt = {
-                margin:       10, // 边距 (mm)
+                margin:       10,
                 filename:     'Homestay_Report_<?php echo date("Ymd"); ?>.pdf',
                 image:        { type: 'jpeg', quality: 0.98 },
-                html2canvas:  { scale: 2 }, // 提高清晰度
+                html2canvas:  { scale: 2 },
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
-            // 生成并下载
             html2pdf().set(opt).from(element).save().then(function(){
-                // 下载开始后，可以选择关闭窗口，或者提示完成
                 document.getElementById('loadingMsg').innerText = "Report Downloaded! You can close this tab.";
             });
         };

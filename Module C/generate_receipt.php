@@ -3,7 +3,6 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// 验证
 if (!isset($_SESSION['admin_id']) && !isset($_SESSION['user_id'])) {
     die("Access Denied");
 }
@@ -11,7 +10,6 @@ if (!isset($_SESSION['admin_id']) && !isset($_SESSION['user_id'])) {
 if (!isset($_GET['booking_id'])) die("Invalid Request");
 $bid = intval($_GET['booking_id']);
 
-// 获取详细数据
 $sql = "SELECT b.*, r.room_name, u.full_name, u.email, u.phone 
         FROM bookings b 
         JOIN rooms r ON b.room_id = r.room_id 
@@ -22,23 +20,18 @@ $result = $conn->query($sql);
 if ($result->num_rows == 0) die("Booking not found");
 $data = $result->fetch_assoc();
 
-// 计算天数
 $d1 = new DateTime($data['check_in_date']);
 $d2 = new DateTime($data['check_out_date']);
 $diff = $d1->diff($d2);
 $days = $diff->days;
 if($days == 0) $days = 1;
 
-// ★★★ 新增：动态状态逻辑 ★★★
 $status_badge = "";
 if ($data['booking_status'] == 'confirmed') {
-    // 绿色 PAID
     $status_badge = '<span class="badge" style="background:#27ae60;">PAID</span>';
 } elseif ($data['booking_status'] == 'cancelled') {
-    // 红色 CANCELLED
     $status_badge = '<span class="badge" style="background:#c0392b;">CANCELLED</span>';
 } else {
-    // 灰色 其他状态
     $status_badge = '<span class="badge" style="background:#7f8c8d;">'.strtoupper($data['booking_status']).'</span>';
 }
 ?>
@@ -61,7 +54,6 @@ if ($data['booking_status'] == 'confirmed') {
             position: relative;
         }
 
-        /* 如果是取消状态，给整个收据加个水印 (可选) */
         <?php if($data['booking_status'] == 'cancelled'): ?>
         #receipt-box::after {
             content: "CANCELLED";
@@ -83,7 +75,6 @@ if ($data['booking_status'] == 'confirmed') {
         .invoice-details { text-align: right; }
         .invoice-details h2 { margin: 0; color: #333; }
         
-        /* Badge 样式 */
         .badge { color: white; padding: 5px 10px; border-radius: 4px; font-size: 14px; vertical-align: middle; display: inline-block; margin-top:5px; font-weight: bold;}
 
         .info-section { display: flex; justify-content: space-between; margin-bottom: 40px; position: relative; z-index: 1;}

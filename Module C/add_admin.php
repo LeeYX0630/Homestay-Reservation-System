@@ -3,7 +3,6 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// --- 安全检查：只有 Super Admin 才能进这个页面 ---
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'superadmin') {
     echo "<script>alert('Access Denied. Super Admin only.'); window.location.href='admin_manage_admins.php';</script>";
     exit();
@@ -24,13 +23,11 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     
     $role = 'admin'; 
 
-    // 1. 验证逻辑
     if (empty($username) || empty($email) || empty($phone) || empty($password) || empty($full_name)) {
         $msg = "<div class='alert error'>All fields are required.</div>";
     } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
         $msg = "<div class='alert error'>Invalid email format.</div>";
     }
-    // ★【修改 1】后端强制验证域名后缀 ★
     elseif (substr($email, -13) !== '@homestay.com') {
         $msg = "<div class='alert error'>Restricted Domain: Admin email must end with <b>@homestay.com</b></div>";
     }
@@ -42,7 +39,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     } elseif ($password !== $confirm_password) {
         $msg = "<div class='alert error'>Passwords do not match.</div>";
     } else {
-        // 2. 查重
         $check_sql = "SELECT admin_id FROM admins WHERE username = ? OR email = ?";
         $stmt = $conn->prepare($check_sql);
         $stmt->bind_param("ss", $username, $email);
@@ -52,7 +48,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($stmt->num_rows > 0) {
             $msg = "<div class='alert error'>Username or Email already taken.</div>";
         } else {
-            // 3. 插入
             $hashed_password = password_hash($password, PASSWORD_DEFAULT);
             $stmt->close(); 
 
@@ -61,7 +56,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $stmt->bind_param("ssssss", $username, $email, $phone, $hashed_password, $full_name, $role);
 
             if ($stmt->execute()) {
-                // 设置 JS 代码，稍后在 HTML 里输出
                 $sweetAlertCode = "
                 Swal.fire({
                     title: 'Admin Added!',
@@ -170,18 +164,14 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 </div>
 
 <script>
-    // --- ★【修改 3】Email 自动补全逻辑 ★ ---
     const emailInput = document.getElementById('emailInput');
     
     emailInput.addEventListener('input', function(e) {
-        // 如果用户输入的最后一个字符是 '@'
         if (e.target.value.endsWith('@')) {
-            // 自动补全后缀
             e.target.value += 'homestay.com';
         }
     });
 
-    // --- 自动格式化电话号码 ---
     const phoneInput = document.getElementById('phoneInput');
     phoneInput.addEventListener('input', function(e) {
         let value = e.target.value.replace(/\D/g, '');
@@ -190,7 +180,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         e.target.value = value;
     });
 
-    // --- 密码强度 ---
     const passwordInput = document.getElementById('passwordInput');
     const strengthBar = document.getElementById('strengthBar');
     const strengthText = document.getElementById('strengthText');

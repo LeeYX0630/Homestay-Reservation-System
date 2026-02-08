@@ -3,7 +3,6 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// --- 1. 基础验证与数据获取 ---
 $room_id = isset($_GET['room_id']) ? intval($_GET['room_id']) : 0;
 $category_id = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
 
@@ -11,7 +10,6 @@ $check_in = isset($_GET['check_in']) ? $_GET['check_in'] : '';
 $check_out = isset($_GET['check_out']) ? $_GET['check_out'] : '';
 
 if ($room_id == 0 || $category_id == 0 || empty($check_in) || empty($check_out)) {
-    // 如果缺少关键参数，跳回目录
     header("Location: ../Module B/room_catalogue.php");
     exit();
 }
@@ -22,35 +20,27 @@ if (!isset($_SESSION['user_id'])) {
 }
 $user_id = $_SESSION['user_id'];
 
-// ★★★ 核心修改：分别查询两张表 ★★★
 
-// 1. 从 ROOMS 表获取房间名字 (Room Name)
 $sql_room = "SELECT room_name FROM rooms WHERE room_id = '$room_id'";
 $res_room = $conn->query($sql_room);
 if ($res_room->num_rows == 0) die("Room not found.");
 $room_data = $res_room->fetch_assoc();
-$room_name_base = $room_data['room_name']; // 比如 "Happy Family Suite"
+$room_name_base = $room_data['room_name'];
 
-// 2. 从 CATEGORIES 表获取价格 (Price) 和 类型 (Type)
 $sql_cat = "SELECT category_name, price_per_night FROM categories WHERE category_id = '$category_id'";
 $res_cat = $conn->query($sql_cat);
 if ($res_cat->num_rows == 0) die("Room category not found.");
 $cat_data = $res_cat->fetch_assoc();
 
-// ★ 强制使用 categories 表的价格 ★
 $price_per_night = floatval($cat_data['price_per_night']); 
-$category_type = $cat_data['category_name']; // 比如 "Deluxe Ocean View"
+$category_type = $cat_data['category_name'];
 
-// 组合显示名称
 $display_room_name = "$room_name_base ($category_type)";
 
-// ★★★ 安全检查：限制日期范围 ★★★
 $one_year_limit = new DateTime();
 $one_year_limit->modify('+1 year');
 
 
-
-// --- 计算天数和总价 ---
 $date1 = new DateTime($check_in);
 $date2 = new DateTime($check_out);
 $interval = $date1->diff($date2);
@@ -59,13 +49,12 @@ $days = $interval->days == 0 ? 1 : $interval->days;
 $original_total = $price_per_night * $days;
 
 
-// --- 下面是优惠券和支付逻辑 (保持不变) ---
 $discount_amount = 0;
 $final_total = $original_total;
 $coupon_msg = "";
 $applied_coupon_code = ""; 
 
-// 2. 优惠券逻辑
+
 $my_coupons = []; 
 $best_coupon_code = "";
 $max_potential_discount = 0;
@@ -99,7 +88,7 @@ if ($res_coupons->num_rows > 0) {
     }
 }
 
-// 3. 应用优惠券
+
 if (($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['apply_coupon'])) || (isset($_GET['auto_best']) && $_GET['auto_best'] == 1)) {
     
     if (isset($_GET['auto_best']) && $_GET['auto_best'] == 1 && !empty($best_coupon_code)) {
@@ -137,7 +126,7 @@ if (($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['apply_coupon'])) || (
     }
 }
 
-// 4. 确认支付
+
 if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
     $final_code = trim($_POST['applied_code_hidden']);
     $final_pay_amount = $original_total;
@@ -159,7 +148,7 @@ if ($_SERVER["REQUEST_METHOD"] == "POST" && isset($_POST['confirm_payment'])) {
         }
     }
 
-    // 插入 Booking
+
     $sql_insert = "INSERT INTO bookings (user_id, room_id, check_in_date, check_out_date, total_price, booking_status, payment_status) 
                    VALUES ('$user_id', '$room_id', '$check_in', '$check_out', '$final_pay_amount', 'confirmed', 'paid')";
 

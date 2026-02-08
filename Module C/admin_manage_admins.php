@@ -1,9 +1,7 @@
 <?php
-// Module C/admin_manage_admins.php
 session_start();
 require_once '../includes/db_connection.php';
 
-// --- ★★★ 核心安全检查：只有 Super Admin 能进 ★★★ ---
 if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'superadmin') {
     echo "<script>alert('Access Denied. Super Admin privileges required.'); window.location.href='admin_dashboard.php';</script>";
     exit();
@@ -11,19 +9,15 @@ if (!isset($_SESSION['role']) || $_SESSION['role'] !== 'superadmin') {
 
 $msg = "";
 
-// --- 1. 处理状态切换 (Deactivate / Activate) ---
 if (isset($_POST['toggle_status'])) {
     $id_to_edit = intval($_POST['admin_id']);
     $current_status = $_POST['current_status'];
     
-    // 决定新状态：如果是 active 就变成 inactive，反之亦然
     $new_status = ($current_status === 'active') ? 'inactive' : 'active';
-    
-    // 防止自杀 (Super Admin 不能停用自己)
+
     if ($id_to_edit == $_SESSION['admin_id']) {
         $msg = "<div class='alert alert-danger'>You cannot deactivate your own account!</div>";
     } else {
-        // 防止停用其他 Super Admin
         $check_sql = "SELECT role FROM admins WHERE admin_id = $id_to_edit";
         $check_res = $conn->query($check_sql);
         $target_role = $check_res->fetch_assoc()['role'];
@@ -31,7 +25,6 @@ if (isset($_POST['toggle_status'])) {
         if ($target_role === 'superadmin') {
              $msg = "<div class='alert alert-danger'>Cannot deactivate another Super Admin.</div>";
         } else {
-            // 执行更新
             $sql = "UPDATE admins SET status = '$new_status' WHERE admin_id = $id_to_edit";
             if ($conn->query($sql)) {
                 $action_word = ($new_status === 'active') ? "Activated" : "Deactivated";
@@ -44,7 +37,6 @@ if (isset($_POST['toggle_status'])) {
     }
 }
 
-// --- 2. 搜索逻辑 ---
 $where_clause = "";
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $s = $conn->real_escape_string($_GET['search']);
@@ -67,7 +59,7 @@ $result = $conn->query($sql);
         .sidebar { min-height: 100vh; background: white; border-right: 1px solid #dee2e6; }
         .nav-link { color: #333; }
         .card { border: none; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .admin-inactive { opacity: 0.6; background-color: #f9f9f9; } /* 停用账号变灰 */
+        .admin-inactive { opacity: 0.6; background-color: #f9f9f9; }
     </style>
 </head>
 <body>

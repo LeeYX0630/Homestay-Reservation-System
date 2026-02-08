@@ -3,7 +3,6 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// --- 1. 获取参数 ---
 $room_id = isset($_GET['room_id']) ? intval($_GET['room_id']) : 0;
 $category_id = isset($_GET['category_id']) ? intval($_GET['category_id']) : 0;
 
@@ -16,13 +15,11 @@ if ($room_id == 0 && $category_id > 0) {
     }
 }
 
-// --- Admin 拦截 ---
 if (isset($_SESSION['admin_id'])) {
     echo "<script>alert('Admins cannot book rooms.'); window.location.href='../Module C/admin_dashboard.php';</script>";
     exit();
 }
 
-// --- 登录检查 ---
 if (!isset($_SESSION['user_id'])) {
     $params = ($category_id > 0) ? "?category_id=$category_id" : "?room_id=$room_id";
     $return_url = urlencode("../Module C/check_availability.php" . $params);
@@ -36,7 +33,6 @@ $max_guests = 4;
 $display_price = 0;
 $display_name = "";
 
-// --- 2. 获取数据 ---
 if ($room_id) {
     $sql = "SELECT * FROM rooms WHERE room_id = $room_id";
     $result = $conn->query($sql);
@@ -59,7 +55,6 @@ if ($room_id) {
     }
 }
 
-// --- 3. 处理提交 (后端验证) ---
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $room_id = intval($_POST['room_id']); 
     $category_id = isset($_POST['category_id']) ? intval($_POST['category_id']) : 0;
@@ -68,26 +63,21 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $check_out = $_POST['check_out'];
     $guests = $_POST['guests'];
     
-    // ★★★ 新增：后端日期验证 ★★★
     $d1 = new DateTime($check_in);
     $d2 = new DateTime($check_out);
     $interval = $d1->diff($d2);
     $days = $interval->days;
     
-    // 计算一年后的日期
     $one_year_later = new DateTime();
     $one_year_later->modify('+1 year');
 
     if (empty($check_in) || empty($check_out)) {
          $msg = "<div class='alert error'>Please select dates from the calendar.</div>";
     } elseif ($days > 29) {
-         // 限制 1：不能超过 29 晚
          $msg = "<div class='alert error'>Maximum booking duration is 29 nights.</div>";
     } elseif ($d2 > $one_year_later) {
-         // 限制 2：不能预订超过 1 年后的
          $msg = "<div class='alert error'>Bookings can only be made up to 1 year in advance.</div>";
     } else {
-        // 检查房间占用
         $check_sql = "SELECT * FROM bookings 
                       WHERE room_id = '$room_id' 
                       AND booking_status != 'cancelled' 
@@ -97,7 +87,6 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         if ($check_result->num_rows > 0) {
             $msg = "<div class='alert error'>Date unavailable! Please check the calendar.</div>";
         } else {
-            // 双重预订检查
             $user_conflict = false;
             $conflict_msg = "";
             if (isset($_SESSION['user_id'])) {

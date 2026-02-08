@@ -3,7 +3,6 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// 权限检查
 if (!isset($_SESSION['admin_id'])) {
     header("Location: ../Module A/admin_login.php");
     exit();
@@ -11,7 +10,6 @@ if (!isset($_SESSION['admin_id'])) {
 
 $msg = "";
 
-// --- 1. 处理添加优惠券 ---
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_coupon'])) {
     $code = strtoupper(trim($_POST['code'])); 
     $discount_value = floatval($_POST['discount_value']);
@@ -42,14 +40,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['add_coupon'])) {
     }
 }
 
-// --- 2. 处理删除优惠券 ---
 if (isset($_POST['delete_coupon'])) {
     $id = intval($_POST['coupon_id']);
     $conn->query("DELETE FROM coupons WHERE coupon_id = $id");
     $msg = "<div class='alert alert-warning'>Voucher deleted.</div>";
 }
 
-// --- 3. 处理分发优惠券 ---
 if (isset($_POST['distribute_coupon'])) {
     $cid = intval($_POST['coupon_id']);
     
@@ -66,22 +62,18 @@ if (isset($_POST['distribute_coupon'])) {
     }
 }
 
-// --- ★ 4. 构建搜索与筛选逻辑 ★ ---
 $where_clauses = [];
 
-// 搜索代码
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $search = $conn->real_escape_string($_GET['search']);
     $where_clauses[] = "code LIKE '%$search%'";
 }
 
-// 筛选类型
 if (isset($_GET['type']) && !empty($_GET['type'])) {
     $type = $conn->real_escape_string($_GET['type']);
     $where_clauses[] = "discount_type = '$type'";
 }
 
-// 筛选状态 (Active / Expired)
 if (isset($_GET['status']) && !empty($_GET['status'])) {
     $status = $_GET['status'];
     if ($status === 'active') {

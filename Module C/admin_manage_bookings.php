@@ -3,13 +3,11 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// 权限检查
 if (!isset($_SESSION['admin_id'])) {
     header("Location: ../Module A/admin_login.php");
     exit();
 }
 
-// --- 处理 POST 请求 (取消或删除) ---
 $msg = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $action = $_POST['action'];
@@ -24,39 +22,32 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     }
 }
 
-// --- 构建筛选查询 (Filter Logic) ---
 $where_clauses = [];
 
-// 1. 搜索关键字 (ID 或 用户名)
 if (isset($_GET['search']) && !empty($_GET['search'])) {
     $search = $conn->real_escape_string($_GET['search']);
-    // 注意：这里假设你有关联 users 表。如果没有，请去掉 u.full_name 的部分
     $where_clauses[] = "(b.booking_id LIKE '%$search%' OR u.full_name LIKE '%$search%')";
 }
 
-// 2. 筛选房间
 if (isset($_GET['room_id']) && !empty($_GET['room_id'])) {
     $rid = intval($_GET['room_id']);
     $where_clauses[] = "b.room_id = '$rid'";
 }
 
-// 3. 筛选状态
 if (isset($_GET['status']) && !empty($_GET['status'])) {
     $st = $conn->real_escape_string($_GET['status']);
     $where_clauses[] = "b.booking_status = '$st'";
 }
 
-// 4. 筛选日期 (Check-in)
 if (isset($_GET['date']) && !empty($_GET['date'])) {
     $dt = $conn->real_escape_string($_GET['date']);
     $where_clauses[] = "b.check_in_date = '$dt'";
 }
 
-// 组合 SQL
 $sql = "SELECT b.*, r.room_name, u.full_name 
         FROM bookings b 
         JOIN rooms r ON b.room_id = r.room_id 
-        LEFT JOIN users u ON b.user_id = u.user_id"; // 关联用户表以获取名字
+        LEFT JOIN users u ON b.user_id = u.user_id";
 
 if (count($where_clauses) > 0) {
     $sql .= " WHERE " . implode(" AND ", $where_clauses);

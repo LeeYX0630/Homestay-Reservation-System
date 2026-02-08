@@ -3,16 +3,12 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// --- 1. 模拟登录 (如果没有做 login.php，请保留这几行用于测试) ---
-// 想要测试普通管理员，请注释掉下面三行
-// 想要测试 Super Admin，请取消注释下面三行
 if (!isset($_SESSION['role'])) {
     $_SESSION['admin_id'] = 1;
-    $_SESSION['username'] = 'superadmin'; // 改成 'manager' 测试普通管理员
-    $_SESSION['role'] = 'superadmin';     // 改成 'admin' 测试普通管理员
+    $_SESSION['username'] = 'superadmin';
+    $_SESSION['role'] = 'superadmin';     
 }
 
-// --- 2. 处理 Super Admin 验证逻辑 (弹窗提交) ---
 $verify_msg = "";
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_super'])) {
     $sa_username = $_POST['sa_username'];
@@ -26,11 +22,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['verify_super'])) {
 
     if ($row = $result->fetch_assoc()) {
         if (password_verify($sa_password, $row['password'])) {
-            // 验证成功！升级权限
             $_SESSION['role'] = 'superadmin';
             $_SESSION['admin_id'] = $row['admin_id'];
             $_SESSION['username'] = $row['username'];
-            header("Location: add_admin.php"); // 跳转
+            header("Location: add_admin.php");
             exit();
         } else {
             $verify_msg = "Wrong password!";
@@ -63,7 +58,6 @@ $days_data = [
     'Thursday' => 0, 'Friday' => 0, 'Saturday' => 0, 'Sunday' => 0
 ];
 
-// 统计订单
 $sql_chart = "SELECT DAYNAME(check_in_date) as day_name, COUNT(*) as cnt 
               FROM bookings 
               WHERE booking_status = 'confirmed'
@@ -74,15 +68,13 @@ if ($res_chart) {
     while ($row = $res_chart->fetch_assoc()) {
         $day = trim($row['day_name']);
         if (isset($days_data[$day])) {
-            $days_data[$day] = (int)$row['cnt']; // 强制转为数字
+            $days_data[$day] = (int)$row['cnt'];
         }
     }
 }
 
-// 找出最大值用于Y轴
 $max_val = max(array_values($days_data)) + 1;
 
-// 构建 JSON 配置
 $chartConfig = [
     'type' => 'bar',
     'data' => [
@@ -119,7 +111,6 @@ $chartConfig = [
     ]
 ];
 
-// 使用 rawurlencode 防止 URL 里的特殊字符报错
 $chartUrl = "https://quickchart.io/chart?c=" . rawurlencode(json_encode($chartConfig));
 ?>
 
@@ -135,14 +126,11 @@ $chartUrl = "https://quickchart.io/chart?c=" . rawurlencode(json_encode($chartCo
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css">
 
     <style>
-      /* Sidebar Adjustments */
       .sidebar { min-height: 100vh; box-shadow: inset -1px 0 0 rgba(0, 0, 0, .1); }
       
-      /* Card Hover Effects */
       .stat-card { transition: transform 0.2s; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
       .stat-card:hover { transform: translateY(-5px); box-shadow: 0 8px 12px rgba(0,0,0,0.2); }
       
-      /* Modal Styles */
       .modal-backdrop { z-index: 1040; }
       .modal { z-index: 1050; }
     </style>

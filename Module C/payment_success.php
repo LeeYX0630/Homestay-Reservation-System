@@ -3,7 +3,6 @@
 session_start();
 require_once '../includes/db_connection.php';
 
-// 1. 安全检查
 if (!isset($_SESSION['user_id']) || !isset($_GET['booking_id'])) {
     header("Location: ../index.php");
     exit();
@@ -12,7 +11,6 @@ if (!isset($_SESSION['user_id']) || !isset($_GET['booking_id'])) {
 $booking_id = intval($_GET['booking_id']);
 $user_id = $_SESSION['user_id'];
 
-// 2. 获取订单详情 (必须是当前登录用户的订单)
 $sql = "SELECT b.*, r.room_name, u.full_name, u.email, u.phone 
         FROM bookings b 
         JOIN rooms r ON b.room_id = r.room_id 
@@ -26,13 +24,11 @@ if ($result->num_rows == 0) {
 
 $data = $result->fetch_assoc();
 
-// 计算天数
 $d1 = new DateTime($data['check_in_date']);
 $d2 = new DateTime($data['check_out_date']);
 $days = $d1->diff($d2)->days;
 if($days == 0) $days = 1;
 
-// 3. 生成 QR Code 内容 (包含关键信息)
 $qr_content = "BOOKING RECEIPT\n" .
               "ID: #" . $booking_id . "\n" .
               "Name: " . $data['full_name'] . "\n" .
@@ -40,7 +36,6 @@ $qr_content = "BOOKING RECEIPT\n" .
               "Check-In: " . $data['check_in_date'] . "\n" .
               "Paid: RM " . $data['total_price'];
               
-// 使用 QR Server API 生成二维码图片 URL
 $qr_url = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" . urlencode($qr_content);
 ?>
 
@@ -64,7 +59,6 @@ $qr_url = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" . url
             border-radius: 10px;
             box-shadow: 0 10px 30px rgba(0,0,0,0.08);
             position: relative;
-            /* 锯齿边缘效果 (可选) */
             background-image: linear-gradient(135deg, #ffffff 25%, transparent 25%), linear-gradient(225deg, #ffffff 25%, transparent 25%);
             background-position: top center;
         }
@@ -174,7 +168,6 @@ $qr_url = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" . url
             const element = document.getElementById('receiptContent');
             const btn = document.querySelector('.action-bar');
             
-            // 配置 html2pdf
             const opt = {
                 margin:       10,
                 filename:     'Receipt_<?php echo $booking_id; ?>.pdf',
@@ -183,7 +176,6 @@ $qr_url = "https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=" . url
                 jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
             };
 
-            // 开始生成
             html2pdf().set(opt).from(element).save();
         }
     </script>
